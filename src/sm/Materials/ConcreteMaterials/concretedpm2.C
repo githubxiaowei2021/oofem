@@ -923,11 +923,11 @@ ConcreteDPM2::computeDamage(const FloatArrayF< 6 > &strain,
     int unAndReloadingFlag = checkForUnAndReloading(tempEquivStrain, minEquivStrain, D, gp);
 
     double rateFactor;
-    if ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) {
+    // if ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) {
         rateFactor = computeRateFactor(tempAlpha, deltaTime, gp, tStep);
-    } else {
-        rateFactor = status->giveRateFactor();
-    }
+	// } else {
+	// rateFactor = status->giveRateFactor();
+	// }
 
 
     //Compute equivalent strains for  tension and compression
@@ -943,19 +943,19 @@ ConcreteDPM2::computeDamage(const FloatArrayF< 6 > &strain,
     }
 
 
-    //If damage threshold is exceeded determine the rate factor from the previous step
-    if ( ( tempEquivStrainTension > e0 || tempEquivStrainCompression > e0 ) &&
-         ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) && !tStep->isTheFirstStep() ) {
-        //Rate factor from last step
-        rateFactor = status->giveRateFactor();
+    //// If damage threshold is exceeded determine the rate factor from the previous step
+    // if ( ( tempEquivStrainTension > e0 || tempEquivStrainCompression > e0 ) &&
+    //      ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) && !tStep->isTheFirstStep() ) {
+    //     //Rate factor from last step
+    //     rateFactor = status->giveRateFactor();
 
-        tempEquivStrainTension = status->giveEquivStrainTension() + ( tempEquivStrain - status->giveEquivStrain() ) / rateFactor;
-        if ( unAndReloadingFlag == 0 ) { //Standard way
-            tempEquivStrainCompression = status->giveEquivStrainCompression() + ( tempAlpha * ( tempEquivStrain - status->giveEquivStrain() ) ) / rateFactor;
-        } else {
-            tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * ( minEquivStrain - status->giveEquivStrain() ) / rateFactor + ( tempAlpha * ( tempEquivStrain - minEquivStrain ) ) / rateFactor;
-        }
-    }
+    //     tempEquivStrainTension = status->giveEquivStrainTension() + ( tempEquivStrain - status->giveEquivStrain() ) / rateFactor;
+    //     if ( unAndReloadingFlag == 0 ) { //Standard way
+    //         tempEquivStrainCompression = status->giveEquivStrainCompression() + ( tempAlpha * ( tempEquivStrain - status->giveEquivStrain() ) ) / rateFactor;
+    //     } else {
+    //         tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * ( minEquivStrain - status->giveEquivStrain() ) / rateFactor + ( tempAlpha * ( tempEquivStrain - minEquivStrain ) ) / rateFactor;
+    //     }
+    // }
 
     status->letTempRateFactorBe(rateFactor);
 
