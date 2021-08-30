@@ -116,7 +116,7 @@ namespace oofem {
  * This class implements associated Material Status to IsotropicDamageMaterial1Rate.
  * Stores the characteristic length of the element.
  */
-class IsotropicDamageMaterial1RateStatus : public IsotropicDamageMaterial1Status, public RandomMaterialStatusExtensionInterface
+class IsotropicDamageMaterial1RateStatus : public IsotropicDamageMaterial1Status
 {
 public:
     /// Constructor
