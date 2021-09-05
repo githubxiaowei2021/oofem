@@ -49,236 +49,134 @@
 
 
 namespace oofem {
-REGISTER_Material(IsotropicDamageMaterial1Rate);
+REGISTER_Material(IDM1Rate);
 
-IsotropicDamageMaterial1Rate :: IsotropicDamageMaterial1Rate(int n, Domain *d) :
-     IsotropicDamageMaterial1(n, d),
-    RandomMaterialExtensionInterface()
+
+IDM1Rate :: IDM1Rate(int n, Domain *d) : IsotropicDamageMaterial1(n, d)
 {
-    // deleted by parent, where linearElasticMaterial instance declared
-    linearElasticMaterial = new IsotropicLinearElasticMaterial(n, d);
+
+}
+
+
+IDM1Rate :: ~IDM1Rate()
+{
+
+}
+
+void
+IDM1Rate :: initializeFrom(InputRecord &ir)
+{
+  IsotropicDamageMaterial1 :: initializeFrom(ir);
+
+  this->strengthRateType = 0;
+  IR_GIVE_OPTIONAL_FIELD(ir, this->strengthRateType, _IFT_IDM1Rate_strengthratetype);
+  if ( this->strengthRateType < 0 || this->strengthRateType > 2 ) {
+    OOFEM_ERROR("strengthRateType not implemented. Must be 0, 1 or 2\n");
+  }
+
 }
 
 
 
-
-double
-IsotropicDamageMaterial1Rate :: computeDamageParam(double kappa, const FloatArray &strain, GaussPoint *gp) const
+void
+IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
+                                                const FloatArray &totalStrain,
+                                                TimeStep *tStep)
+//
+// returns real stress vector in 3d stress space of receiver according to
+// previous level of stress and current
+// strain increment, the only way, how to correctly update gp records
+//
 {
-    if ( this->softType == ST_Disable_Damage ) { //dummy material with no damage
-        return 0.;
-    } else if ( isCrackBandApproachUsed() ) { // adjustment of softening law according to the element size, given crack opening or fracture energy
-        return computeDamageParamForCohesiveCrack(kappa, gp);
-    } else { // no adjustment according to element size, given fracturing strain
-        return damageFunction(kappa, gp);
-    }
-}
+    IsotropicDamageMaterialStatus *status = static_cast< IsotropicDamageMaterialStatus * >( this->giveStatus(gp) );
+    //StructuralCrossSection *crossSection = (StructuralCrossSection*) gp -> giveElement()->giveCrossSection();
+    LinearElasticMaterial *lmat = this->giveLinearElasticMaterial();
+    FloatArray reducedTotalStrainVector;
+    FloatMatrix de;
+    double f, equivStrain, tempKappa = 0.0, omega = 0.0;
 
-double
-IsotropicDamageMaterial1Rate :: computeDamageParamForCohesiveCrack(double kappa, GaussPoint *gp, TimeStep *tStep, double tempAlpha) const
-{
-    const double e0 = this->give(e0_ID, gp);  // e0 is the strain at the peak stress
-    const double E = this->linearElasticMaterial->give('E', gp);
-    const double gf = this->give(gf_ID, gp);
-    double wf = this->give(wf_ID, gp);     // wf is the crack opening
-    double omega = 0.0;
-    double rateFactor = computeRateFactor(tempAlpha, gp, tStep);
-    
+    this->initTempStatus(gp);
 
-    if ( kappa > e0 ) {
-        if ( this->gf != 0. ) { //cohesive crack model
-            if ( softType == ST_Exponential_Cohesive_Crack ) { // exponential softening
-                wf = this->gf / E / e0; // wf is the crack opening
-            } else if ( softType == ST_Linear_Cohesive_Crack || softType == ST_BiLinear_Cohesive_Crack ) { // (bi)linear softening law
-                wf = 2. * gf / E / e0; // wf is the crack opening
-            } else {
-                OOFEM_ERROR("Gf unsupported for softening type softType = %d", softType);
-            }
-        } else if ( softType == ST_BiLinear_Cohesive_Crack ) {
-            wf = this->wk / ( e0 * E - this->sk ) * ( e0 * E );
-        }
+    // subtract stress-independent part
+    // note: eigenStrains (temperature) are present in strains stored in gp
+    // therefore it is necessary to subtract always the total eigen strain value
+    this->giveStressDependentPartOfStrainVector(reducedTotalStrainVector, gp, totalStrain, tStep, VM_Total);
 
+    //crossSection->giveFullCharacteristicVector(totalStrainVector, gp, reducedTotalStrainVector);
 
-        auto status = static_cast< IsotropicDamageMaterial1RateStatus * >( this->giveStatus(gp) );
-        double Le = status->giveLe();
-        double ef = wf / Le;    //ef is the fracturing strain /// FIXME CHANGES BEHAVIOR!
-        if ( ef < e0 ) { //check that no snapback occurs
-            double minGf = 0.;
-            OOFEM_WARNING("ef %e < e0 %e, this leads to material snapback in element %d, characteristic length %f", ef, e0, gp->giveElement()->giveNumber(), Le);
-            if ( gf != 0. ) { //cohesive crack
-                if ( softType == ST_Exponential_Cohesive_Crack ) { //exponential softening
-                    minGf = E * e0 * e0 * Le;
-                } else if ( softType == ST_Linear_Cohesive_Crack || softType == ST_BiLinear_Cohesive_Crack ) { //(bi)linear softening law
-                    minGf = E * e0 * e0 * Le / 2.;
-                } else {
-                    OOFEM_WARNING("Gf unsupported for softening type softType = %d", softType);
-                }
+    // compute equivalent strain
+    equivStrain = this->computeEquivalentStrain(reducedTotalStrainVector, gp, tStep);
 
-                if ( checkSnapBack ) {
-                    OOFEM_ERROR("Material number %d, decrease e0, or increase Gf from %f to Gf=%f", this->giveNumber(), gf, minGf);
-                }
-            }
+    if ( llcriteria == idm_strainLevelCR ) {
+        // compute value of loading function if strainLevel crit apply
+        f = equivStrain - status->giveKappa();
 
-            if ( checkSnapBack ) { //given fracturing strain
-                OOFEM_ERROR("Material number %d, increase ef %f to minimum e0 %f", this->giveNumber(), ef, e0);
-            }
-        }
-
-        if ( this->softType == ST_Linear_Cohesive_Crack ) {
-            if ( kappa < ef ) {
-	      omega = ( ef / ( kappa * rateFactor) ) * ( kappa * rateFactor  - e0 ) / ( ef - e0 );
-            } else {
-                omega = 1.0; //maximum omega (maxOmega) is adjusted just for stiffness matrix in isodamagemodel.C
-            }
-        } else if (  this->softType == ST_BiLinear_Cohesive_Crack ) {
-            double gft = this->give(gft_ID, gp);
-            double ef, sigmak, epsf, ek;
-            if ( gft > 0.0 ) {
-                ek = this->give(ek_ID, gp);
-                ef = 2 * gf / E / e0 / Le; //the first part corresponds to linear softening
-                sigmak = E * e0 * ( ef - ek ) / ( ef - e0 );
-                epsf = 2 * ( gft - gf ) / sigmak / Le + ef;
-
-                if ( gft < gf ) {
-                    OOFEM_ERROR("The total fracture energy gft %f must be greater than the initial fracture energy gf %f", gft, gf);
-                }
-            } else {
-                ek     = this->wk / Le + ( this->sk ) / E;
-                ef     = ( this->wk / ( e0 * E - this->sk ) * ( e0 * E ) ) / Le;
-                sigmak = this->sk;
-                epsf   = this->wf / Le;
-            }
-            if ( ( ek > ef ) || ( ek < e0 ) ) {
-                OOFEM_WARNING("ek %f is not between e0 %f and ef %f", ek, e0, ef);
-            }
-
-            if ( kappa <= ek ) {
-	      omega = 1.0 - ( ( e0 / ( kappa * rateFactor ) ) * ( ek - kappa * rateFactor ) / ( ek - e0 ) + ( ( sigmak / ( E * kappa * rateFactor ) ) * ( kappa * rateFactor - e0 ) / ( ek - e0 ) ) );
-            } else if ( kappa > ek && kappa <= epsf ) {
-                omega = 1.0 - ( ( sigmak / ( E * kappa * rateFactor ) ) * ( epsf - kappa * rateFactor ) / ( epsf - ek ) );
-            } else if ( kappa <= e0 ) {
-                omega = 0.0;
-            } else {
-                omega = maxOmega;
-            }
-        } else if (  this->softType == ST_Exponential_Cohesive_Crack ) {
-            // exponential cohesive crack - iteration needed
-            double R, Lhs, help;
-            int nite = 0;
-            // iteration to achieve objectivity
-            // we are looking for a state in which the elastic stress is equal to
-            // the stress from crack-opening relation
-            // ef has now the meaning of strain
-            do {
-                nite++;
-                help = omega * kappa / ef;
-                R = ( 1. - omega ) * kappa - e0 *exp(-help); //residuum
-                Lhs = kappa - e0 *exp(-help) * kappa / ef; //- dR / (d omega)
-                omega += R / Lhs;
-                if ( nite > 40 ) {
-                    OOFEM_ERROR("algorithm not converging");
-                }
-            } while ( fabs(R) >= e0 * IDM1_ITERATION_LIMIT );
+        if ( f <= 0.0 ) {
+            // damage does not grow
+            tempKappa = status->giveKappa();
+            omega     = status->giveDamage();
         } else {
-            OOFEM_ERROR("Unknown softening type for cohesive crack model.");
+            // damage grows
+            tempKappa = equivStrain;
+            this->initDamaged(tempKappa, reducedTotalStrainVector, gp);
+            // evaluate damage parameter
+            omega = this->computeDamageParam(tempKappa, reducedTotalStrainVector, gp);
         }
-
-        if ( omega > 1.0 ) {
-            OOFEM_WARNING("damage parameter is %f, which is greater than 1, snap-back problems", omega);
-            omega = maxOmega;
-            if ( checkSnapBack ) {
-                OOFEM_ERROR("");
-            }
+    } else if ( llcriteria == idm_damageLevelCR ) {
+        // evaluate damage parameter first
+        tempKappa = equivStrain;
+        this->initDamaged(tempKappa, reducedTotalStrainVector, gp);
+        omega = this->computeDamageParam(tempKappa, reducedTotalStrainVector, gp);
+        if ( omega < status->giveDamage() ) {
+            // unloading takes place
+            omega = status->giveDamage();
         }
-
-        if ( omega < 0.0 ) {
-            OOFEM_WARNING("damage parameter is %f, which is smaller than 0, snap-back problems", omega);
-            omega = 0.0;
-            if ( checkSnapBack ) {
-                OOFEM_ERROR("");
-            }
-        }
+    } else {
+        OOFEM_ERROR("unsupported loading/unloading criterion");
     }
-    return omega;
+
+
+    lmat->giveStiffnessMatrix(de, SecantStiffness, gp, tStep);
+    //mj
+    // permanent strain - so far implemented only in 1D
+    if ( permStrain && reducedTotalStrainVector.giveSize() == 1 ) {
+        double epsp = evaluatePermanentStrain(tempKappa, omega);
+        reducedTotalStrainVector.at(1) -= epsp;
+    }
+    // damage deactivation in compression for 1D model
+    if ( ( reducedTotalStrainVector.giveSize() > 1 ) || ( reducedTotalStrainVector.at(1) > 0. ) ) {
+        //emj
+        de.times(1.0 - omega);
+    }
+
+    answer.beProductOf(de, reducedTotalStrainVector);
+
+    // update gp
+    status->letTempStrainVectorBe(totalStrain);
+    status->letTempStressVectorBe(answer);
+    status->setTempKappa(tempKappa);
+    status->setTempDamage(omega);
+#ifdef keep_track_of_dissipated_energy
+    status->computeWork(gp);
+#endif
 }
+
 
 double
-IsotropicDamageMaterial1Rate ::computeRateFactor(double alpha,
-                                GaussPoint *gp,
-                                TimeStep *tStep) const
+IDM1Rate ::computeRateFactor(FloatArray &strain,
+			     double alpha,
+			     GaussPoint *gp,
+			     TimeStep *tStep) const
 {
-    this->strengthRateType = 0;
-    IR_GIVE_OPTIONAL_FIELD(ir, this->strengthRateType, _IFT_IsotropicDamageMaterial1Rate_strengthratetype);
-    if ( this->strengthRateType < 0 || this->strengthRateType > 2 ) {
-        OOFEM_ERROR("strengthRateType not implemented. Must be 0, 1 or 2\n");
-    }
 
-    if ( this->strengthRateType == 0 ) {
-        return 1;
-    }
+  //Peter: I don't think that you need to have multiple strain rate factors. Tension is sufficient, since the model uses only one damage variable. Also, I suggest to have the strain as an input into the function (as it is done above), because reduced strain is not stored in the status of imd1rate.
 
-    auto status = static_cast< IsotropicDamageMaterial1RateStatus * >( this->giveStatus(gp) );
+  double rateFactor;
 
-    //Determine the principal values of the strain
-    auto principalStrain = StructuralMaterial::computePrincipalValues(from_voigt_strain);   ///@todo CHECK
-
-    //Determine max and min value;
-    double maxStrain = -1.e20, minStrain = 1.e20;
-    for ( int k = 1; k <= principalStrain.giveSize(); k++ ) {
-        //maximum
-        if ( principalStrain.at(k) > maxStrain ) {
-            maxStrain = principalStrain.at(k);
-        }
-
-        //minimum
-        if ( principalStrain.at(k) < minStrain ) {
-            minStrain = principalStrain.at(k);
-        }
-    }
-
-
-    //Tension
-    //For tension according to Model Code 2010
-    double rateFactorTension = 1.;
-    double strainRateRatioTension = strainRate / 1.e-6;
-
-    if ( this->strengthRateType == 1 ) {
-        if ( strainRate < 1.e-6 ) {
-            rateFactorTension = 1.;
-        } else if ( 1.e-6 < strainRate ) {
-            rateFactorTension = pow(strainRateRatioTension, 0.018);
-        }
-    } else if ( this->strengthRateType == 2 ) {
-        if ( strainRate < 1.e-6 ) {
-            rateFactorTension = 1.;
-        } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
-            rateFactorTension = pow(strainRateRatioTension, 0.018);
-        } else {
-            rateFactorTension =  0.0062 * pow(strainRateRatioTension, 1. / 3.);
-        }
-    }
-
-    //For compression according to Model Code 2010
-    double rateFactorCompression = 1.;
-    double strainRateRatioCompression = strainRate / ( -30.e-6 );
-    if ( this->strengthRateType == 1 ) {
-        if ( strainRate > -30.e-6 ) {
-            rateFactorCompression = 1.;
-        } else if ( -30.e-6 > strainRate ) {
-            rateFactorCompression = pow(strainRateRatioCompression, 0.014);
-        }
-    } else if ( this->strengthRateType == 2 ) {
-        if ( strainRate > -30.e-6 ) {
-            rateFactorCompression = 1.;
-        } else if ( -30.e-6 > strainRate && strainRate > -30 ) {
-            rateFactorCompression = pow(strainRateRatioCompression, 0.014);
-        } else if ( -30 > strainRate && strengthRateType == 2 ) {
-            rateFactorCompression =  0.012 * pow(strainRateRatioCompression, 0.333);
-        }
-    }
-
-    double rateFactor = ( 1. - alpha ) * rateFactorTension + alpha * rateFactorCompression;
-
-    return rateFactor;
+  //Peter: Add here the calculation of the rate factor
+  
+  return rateFactor;
 }
+  
 
+}     // end namespace oofem
