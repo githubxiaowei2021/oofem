@@ -217,9 +217,9 @@ set (sm_material
     Materials/ConcreteMaterials/concretedpm.C 
     Materials/ConcreteMaterials/concretedpm2.C
     Materials/ConcreteMaterials/idm1.C 
-    Materials/ConcreteMaterials/idm1rate.C
     Materials/ConcreteMaterials/idmnl1.C 
     Materials/ConcreteMaterials/idmgrad.C
+    Materials/ConcreteMaterials/idm1rate.C
     Materials/ConcreteMaterials/mazarsmodel.C 
     Materials/ConcreteMaterials/mazarsmodelnl.C
     Materials/ConcreteMaterials/mplasticmaterial2.C

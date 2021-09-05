@@ -39,337 +39,70 @@
  * Select the mapping algorithm. The IDM_USE_MMAShapeFunctProjection does not work, since
  * this mapper does not preserve the max. property of damage and equivalent strain.
  */
-//#define IDM_USE_MMAClosestIPTransfer
-#define IDM_USE_MMAContainingElementProjection
-//#define IDM_USE_MMAShapeFunctProjection
-//#define IDM_USE_MMALeastSquareProjection
 
 /*
  * Selects the use of mapped strain or projected strain from element.
  */
-#define IDM_USE_MAPPEDSTRAIN
 
-#include "sm/Materials/ConcreteMaterials/idm1.h"
 #include "material.h"
 #include "sm/Materials/linearelasticmaterial.h"
-#include "sm/Materials/isodamagemodel.h"
+#include "sm/Materials/ConcreteMaterials/idm1.h"
 #include "sm/Materials/structuralms.h"
-#include "randommaterialext.h"
-#include "materialmapperinterface.h"
 
-#ifdef IDM_USE_MMAClosestIPTransfer
- #include "mmaclosestiptransfer.h"
-#endif
 
-#ifdef IDM_USE_MMAContainingElementProjection
- #include "mmacontainingelementprojection.h"
-#endif
+#define _IFT_IDM1Rate_Name "idm1rate"
+#define _IFT_IDM1Rate_strengthratetype "sratetype"
 
-#ifdef IDM_USE_MMAShapeFunctProjection
- #include "mmashapefunctprojection.h"
-#endif
-
-#ifdef IDM_USE_MMALeastSquareProjection
- #include "mmaleastsquareprojection.h"
-#endif
-
-///@name Input fields for IsotropicDamageMaterial1Rate
-//@{
-#define _IFT_IsotropicDamageMaterial1Rate_Name "idm1rate"
-#define _IFT_IsotropicDamageMaterial1Rate_e0 "e0"
-#define _IFT_IsotropicDamageMaterial1Rate_ef "ef"
-#define _IFT_IsotropicDamageMaterial1Rate_wf "wf"
-#define _IFT_IsotropicDamageMaterial1Rate_equivstraintype "equivstraintype"
-#define _IFT_IsotropicDamageMaterial1Rate_damageLaw "damlaw"
-#define _IFT_IsotropicDamageMaterial1Rate_k "k"
-#define _IFT_IsotropicDamageMaterial1Rate_md "md"
-#define _IFT_IsotropicDamageMaterial1Rate_ecsm "ecsm"
-#define _IFT_IsotropicDamageMaterial1Rate_At "at"
-#define _IFT_IsotropicDamageMaterial1Rate_Bt "bt"
-#define _IFT_IsotropicDamageMaterial1Rate_ft "ft"
-#define _IFT_IsotropicDamageMaterial1Rate_wkwf "wkwf"
-#define _IFT_IsotropicDamageMaterial1Rate_e1ef "e1ef"
-#define _IFT_IsotropicDamageMaterial1Rate_skft "skft"
-#define _IFT_IsotropicDamageMaterial1Rate_s1 "s1"
-#define _IFT_IsotropicDamageMaterial1Rate_sk "sk"
-#define _IFT_IsotropicDamageMaterial1Rate_wk "wk"
-#define _IFT_IsotropicDamageMaterial1Rate_e1 "e1"
-#define _IFT_IsotropicDamageMaterial1Rate_ek "ek"
-#define _IFT_IsotropicDamageMaterial1Rate_gf "gf"
-#define _IFT_IsotropicDamageMaterial1Rate_gft "gft"
-#define _IFT_IsotropicDamageMaterial1Rate_ep "ep"
-#define _IFT_IsotropicDamageMaterial1Rate_e2 "e2"
-#define _IFT_IsotropicDamageMaterial1Rate_nd "nd"
-#define _IFT_IsotropicDamageMaterial1Rate_checkSnapBack "checksnapback"
-#define _IFT_IsotropicDamageMaterial1Rate_n "griff_n"
-#define _IFT_IsotropicDamageMaterial1Rate_c1 "c1"
-#define _IFT_IsotropicDamageMaterial1Rate_c2 "c2"
-#define _IFT_IsotropicDamageMaterial1Rate_alphaps "alphaps"
-#define _IFT_IsotropicDamageMaterial1Rate_h "h"
-#define _IFT_IsotropicDamageMaterial1Rate_strengthratetype "sratetype"
-//@}
 
 namespace oofem {
-#define IDM1Rate_ITERATION_LIMIT 1.e-9
 
 /**
- * This class implements associated Material Status to IsotropicDamageMaterial1Rate.
+ * This class implements associated Material Status to IDM1Rate.
  * Stores the characteristic length of the element.
  */
-class IsotropicDamageMaterial1RateStatus : public IsotropicDamageMaterial1Status
+  class IDM1RateStatus : public IsotropicDamageMaterial1Status
 {
 public:
     /// Constructor
-    IsotropicDamageMaterial1RateStatus(GaussPoint *g);
+    IDM1RateStatus(GaussPoint *g);
 
-    const char *giveClassName() const override { return "IsotropicDamageMaterial1RateStatus"; }
+    const char *giveClassName() const override { return "IDM1RateStatus"; }
 
     Interface *giveInterface(InterfaceType it) override;
 };
 
 /**
- * This class implements a simple local isotropic damage model 1 for concrete in tension.
- * A model is based on isotropic damage concept, assuming that damage evolution law
- * is postulated in explicit form, relation damage parameter (omega) to scalar measure
- * of the largest strain level ever reached in material (kappa).
+ * This class implements rate dependence for idm1
+ * @author: Xiaowei Liu, Peter Grassl
  */
-class IsotropicDamageMaterial1Rate : public IsotropicDamageMaterial1,
-    public RandomMaterialExtensionInterface,
-    public MaterialModelMapperInterface
+class IDM1Rate : public IsotropicDamageMaterial1
 {
 protected:
-    /// Equivalent strain at stress peak (or a similar parameter).
-    double e0 = 0.;
-    /// Determines ductility -> corresponds to fracturing strain.
-    double ef = 0.;
-    /// Determines ductility -> corresponds to crack opening in the cohesive crack model.
-    double wf = 0.;
 
-    /**
-     * Determines the softening -> corresponds to the initial fracture energy. For a linear law, it is the area
-     * under the stress/strain curve. For an exponential law, it is the area bounded by the elastic range
-     * and a tangent to the softening part of the curve at the peak stress. For a bilinear law,
-     * gf corresponds to area bounded by elasticity and the first linear softening line projected to zero stress.
-     */
-    double gf = 0.;
-
-    /// Determines the softening for the bilinear law -> corresponds to the total fracture energy.
-    double gft = 0.;
-
-    /// Determines the softening for the bilinear law -> corresponds to the strain at the knee point.
-    double ek = 0.;
-
-    /// Determines the softening for the bilinear law -> corresponds to the crack opening at the knee point.
-    double wk = 0.;
-
-    /// Determines the softening for the bilinear law -> corresponds to the stress at the knee point.
-    double sk = 0.;
-
-    /// Parameters used in Hordijk's softening law
-    double c1 = 3., c2 = 6.93;  // default value of Hordijk parameter
-
-    /** Type characterizing the algorithm used to compute equivalent strain measure.
-     *  Note that the assigned numbers to enum values have to correspond to values
-     *  used in initializeFrom to resolve EquivStrainType. If not, the consistency
-     *  between initializeFrom and giveInputRecord methods is lost.
-     */
-    enum EquivStrainType {
-        EST_Mazars=0,
-        EST_Rankine_Smooth=1,
-        EST_ElasticEnergy=2,
-        EST_Mises=3,
-        EST_Rankine_Standard=4,
-        EST_ElasticEnergyPositiveStress=5,
-        EST_ElasticEnergyPositiveStrain=6,
-        EST_Griffith=7,
-        EST_Unknown = 100
-    };
-    /// Parameter specifying the definition of equivalent strain.
-    EquivStrainType equivStrainType = EST_Unknown;
-
-    /// Parameter used in Mises definition of equivalent strain.
-    double k = 0.;
-
-    /// Parameter used in Griffith's criterion
-    double griff_n = 8.;
-
-    /// Temporary parameter reading type of softening law, used in other isotropic damage material models.
-    int damageLaw = 0;
-
-    /** Type characterizing the formula for the damage law. For example, linear softening can be specified
-     *   with fracturing strain or crack opening.
-     */
-    enum SofteningType { ST_Unknown, ST_Exponential, ST_Linear, ST_Mazars, ST_Smooth, ST_SmoothExtended, ST_Exponential_Cohesive_Crack, ST_Linear_Cohesive_Crack, ST_BiLinear_Cohesive_Crack, ST_Disable_Damage, ST_PowerExponential, ST_DoubleExponential, ST_Hordijk_Cohesive_Crack, ST_ModPowerExponential };
-
-    /// Parameter specifying the type of softening (damage law).
-    SofteningType softType = ST_Unknown;
-
-    /// Parameters used in Mazars damage law.
-    double At = 0., Bt = 0.;
-    /// Parameter used in "smooth damage law".
-    double md = 1.;
-
-    /// Parameters used if softType = 7 (extended smooth damage law)
-    double e1 = 0., e2 = 0., s1 = 0., nd = 0.;
-    /// Check possible snap back flag
-    int checkSnapBack = 0;
-
-    /// auxiliary input variablesfor softType == ST_SmoothExtended
-    double ep = 0., ft = 0.;
-
-    /// Parameters used by the model with permanent strain
-    double ps_alpha = 0., ps_H = 0.;
-
-    /// Method used for evaluation of characteristic element size
-    ElementCharSizeMethod ecsMethod = ECSM_Unknown;
-
-    /// Cached source element set used to map internal variables (adaptivity), created on demand
-    Set *sourceElemSet = nullptr;
-
-    /// Strains that are used for calculation of strain rates
-    double rateFactor = 1.;
-    double tempRateFactor = 0.;
-    double strainRate = 0.;
-    double tempRateStrain = 0.;
-    /** Type of strength strain rate dependence used.
-     * 0 = no strain rate (default)
-     * 1 = Model Code 2010 initial branch of strain rate effect for strength
-     * 2 = Model Code 2010 initial and second branch of strain rate effect for strength
-     */
-    int strengthRateType = 0;
-
-#ifdef IDM_USE_MMAClosestIPTransfer
-    /// Mapper used to map internal variables in adaptivity.
-    static MMAClosestIPTransfer mapper;
-#endif
-#ifdef IDM_USE_MMAContainingElementProjection
-    /// Mapper used to map internal variables in adaptivity.
-    static MMAContainingElementProjection mapper;
-#endif
-#ifdef IDM_USE_MMAShapeFunctProjection
-    /// Mapper used to map internal variables in adaptivity.
-    static MMAShapeFunctProjection mapper;
-#endif
-#ifdef IDM_USE_MMALeastSquareProjection
-    /// Mapper used to map internal variables in adaptivity.
-    static MMALeastSquareProjection mapper;
-#endif
-
+  /** Type of strength strain rate dependence used.
+   * 0 = no strain rate (default)
+   * 1 = Model Code 2010 initial branch of strain rate effect for strength
+   * 2 = Model Code 2010 initial and second branch of strain rate effect for strength
+   */
+  int strengthRateType = 0;
+  
 public:
     /// Constructor
-    IsotropicDamageMaterial1Rate(int n, Domain *d);
+    IDM1Rate(int n, Domain *d);
     /// Destructor
-    virtual ~IsotropicDamageMaterial1Rate();
+    virtual ~IDM1Rate();
 
-    const char *giveClassName() const override { return "IsotropicDamageMaterial1Rate"; }
-    const char *giveInputRecordName() const override { return _IFT_IsotropicDamageMaterial1Rate_Name; }
+    const char *giveClassName() const override { return "IDM1Rate"; }
+    
     void initializeFrom(InputRecord &ir) override;
-    void giveInputRecord(DynamicInputRecord &input) override;
-    /**
-     * Computes invariants I1 and J2 of the strain tensor
-     * from the strain components stored in a vector.
-     * @param strainVector Input strain components.
-     * @param[out] I1e Output value of strain invariant I1.
-     * @param[out] J2e Output value of strain invariant J2.
-     */
-    static void computeStrainInvariants(const FloatArray &strainVector, double &I1e, double &J2e);
 
-    bool isCrackBandApproachUsed() const { return ( this->softType == ST_Exponential_Cohesive_Crack || this->softType == ST_Linear_Cohesive_Crack || this->softType == ST_BiLinear_Cohesive_Crack || this->gf != 0. ); }
-    double computeEquivalentStrain(const FloatArray &strain, GaussPoint *gp, TimeStep *tStep) const override;
-
-    void computeEta(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep) const override;
-    double computeDamageParam(double kappa, const FloatArray &strain, GaussPoint *gp) const override;
-    /**
-     * computes the value of damage parameter omega,
-     * based on a given value of equivalent strain,
-     * using iterations to achieve objectivity,
-     * based on the crack band concept (effective element size used)
-     * @param[out] omega Contains the resulting damage.
-     * @param kappa Equivalent strain measure.
-     * @param gp Integration point.
-     */
-    double computeDamageParamForCohesiveCrack(double kappa, GaussPoint *gp) const;
-    /**
-     * Get the rate factor of the damage model from the
-     * material status.
-     * @return rate factor rateFactor.
-     */
-    double giveRateFactor() const
-    { return rateFactor; }
-    /**
-     * Returns the value of damage parameter
-     * corresponding to a given value
-     * of the damage-driving variable kappa,
-     * depending on the type of selected damage law,
-     * using a simple dependence (no adjustment for element size).
-     * @param kappa Equivalent strain measure.
-     * @param gp Integration point.
-     */
-    double damageFunction(double kappa, GaussPoint *gp) const;
-    /**
-     * Returns the value of compliance parameter
-     * corresponding to a given value
-     * of the damage-driving variable kappa,
-     * depending on the type of selected damage law,
-     * using a simple dependence (no adjustment for element size).
-     * The compliance parameter gamma is defined as
-     * gamma = omega/(1-omega)
-     * where omega is the damage.
-     * @param kappa Equivalent strain measure.
-     * @param gp Integration point.
-     */
-    /**
-     * Returns the value of derivative of damage function
-     * wrt damage-driving variable kappa corresponding
-     * to a given value of the  kappa, depending on
-     * the type of selected damage law.
-     * @param kappa Equivalent strain measure.
-     * @param gp Integration point.
-     */
-    double damageFunctionPrime(double kappa, GaussPoint *gp) const override;
-    /**
-     * Returns the value of compliance parameter
-     * corresponding to a given value
-     * of the damage-driving variable kappa,
-     * depending on the type of selected damage law,
-     * using a simple dependence (no adjustment for element size).
-     * The compliance parameter gamma is defined as
-     * gamma = omega/(1-omega)
-     * where omega is the damage.
-     * @param kappa Equivalent strain measure.
-     * @param gp Integration point.
-     */
-    double complianceFunction(double kappa, GaussPoint *gp) const;
-    /**
-     * This function computes the rate factor which is used to take into account the strain rate dependence of the material.
-     */
-    double computeRateFactor(double alpha, GaussPoint *gp, TimeStep *deltaTime) const;
-    double evaluatePermanentStrain(double kappa, double omega) const override;
-
-    Interface *giveInterface(InterfaceType it) override;
-
-    int MMI_map(GaussPoint *gp, Domain *oldd, TimeStep *tStep) override;
-    int MMI_update(GaussPoint *gp, TimeStep *tStep, FloatArray *estrain = nullptr) override;
-    int MMI_finish(TimeStep *tStep) override;
-
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override;
-    MaterialStatus *giveStatus(GaussPoint *gp) const override;
-
-    double give(int aProperty, GaussPoint *gp) const override;
-
-    bool isCharacteristicMtrxSymmetric(MatResponseMode rMode) const override { return false; }
-
+    void giveRealStressVector(FloatArray &answer, GaussPoint *gp,
+				      const FloatArray &reducedStrain, TimeStep *tStep) override;
+    
+    double computeRateFactor(FloatArray &strain, double alpha, GaussPoint *gp, TimeStep *deltaTime) const;
+    
 protected:
-    /**
-     * Performs initialization, when damage first appear. The characteristic length is
-     * computed from the direction of largest positive principal strain and stored
-     * in corresponding status.
-     * @param kappa Scalar measure of strain level.
-     * @param totalStrainVector Current total strain vector.
-     * @param gp Integration point.
-     */
-    void initDamaged(double kappa, FloatArray &totalStrainVector, GaussPoint *gp) const override;
-    int tempAlphae;
+
 };
 } // end namespace oofem
 #endif // idm1rate_h
