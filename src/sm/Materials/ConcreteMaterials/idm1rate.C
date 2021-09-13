@@ -110,14 +110,16 @@ IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     if ( llcriteria == idm_strainLevelCR ) {
         // compute value of loading function if strainLevel crit apply
         f = equivStrain - status->giveKappa();
-
+double rateFactor = 1;
         if ( f <= 0.0 ) {
             // damage does not grow
             tempKappa = status->giveKappa();
             omega     = status->giveDamage();
         } else {
             // damage grows
-            tempKappa = equivStrain;
+            //tempKappa = equivStrain;
+            rateFactor = computeRateFactor(reducedTotalStrainVector, 0, gp, tStep);
+            tempKappa = f/rateFactor + status->giveKappa();
             this->initDamaged(tempKappa, reducedTotalStrainVector, gp);
             // evaluate damage parameter
             omega = this->computeDamageParam(tempKappa, reducedTotalStrainVector, gp);
@@ -169,14 +171,44 @@ IDM1Rate ::computeRateFactor(FloatArray &strain,
 			     TimeStep *tStep) const
 {
 
-  //Peter: I don't think that you need to have multiple strain rate factors. Tension is sufficient, since the model uses only one damage variable. Also, I suggest to have the strain as an input into the function (as it is done above), because reduced strain is not stored in the status of imd1rate.
+    // Peter: I don't think that you need to have multiple strain rate factors. Tension is sufficient, since the model uses only one damage variable. Also, I suggest to have the strain as an input into the function (as it is done above), because reduced strain is not stored in the status of imd1rate.
+    if ( this->strengthRateType == 0 ) {
+        return 1;
+    }
 
-  double rateFactor;
+    auto status = static_cast<IsotropicDamageMaterialStatus *>( this->giveStatus( gp ) );
 
-  //Peter: Add here the calculation of the rate factor
-  
-  return rateFactor;
+    // Determine the principal values of the strain
+    auto principalStrain = StructuralMaterial::computePrincipalValues( from_voigt_strain( strain ) ); ///@todo CHECK
+
+    double strainRate;
+
+    strainRate = ( principalStrain - status->giveprincipalStrain() ) / tStep;
+
+    double rateFactor = 1.;
+
+    // Peter: Add here the calculation of the rate factor
+    double strainRateRatio = strainRate / 1.e-6;
+
+    if ( this->strengthRateType == 1 ) {
+        if ( strainRate < 1.e-6 ) {
+            rateFactor = 1.;
+        } else if ( 1.e-6 < strainRate ) {
+            rateFactor = pow( strainRateRatio, 0.018 );
+        }
+    } else if ( this->strengthRateType == 2 ) {
+        if ( strainRate < 1.e-6 ) {
+            rateFactor = 1.;
+        } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
+            rateFactor = pow( strainRateRatio, 0.018 );
+        } else {
+            rateFactor = 0.0062 * pow( strainRateRatio, 1. / 3. );
+        }
+    }
+
+    return rateFactor;
 }
-  
 
-}     // end namespace oofem
+
+}
+// end namespace oofem
