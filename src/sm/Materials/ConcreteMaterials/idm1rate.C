@@ -88,64 +88,58 @@ IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 // strain increment, the only way, how to correctly update gp records
 //
 {
-    IsotropicDamageMaterialStatus *status = static_cast< IsotropicDamageMaterialStatus * >( this->giveStatus(gp) );
+    IDM1RateStatus *status = static_cast< IDM1RateStatus * >( this->giveStatus(gp) );
     //StructuralCrossSection *crossSection = (StructuralCrossSection*) gp -> giveElement()->giveCrossSection();
     LinearElasticMaterial *lmat = this->giveLinearElasticMaterial();
     FloatArray reducedTotalStrainVector;
     FloatMatrix de;
-    double f, equivStrain, tempKappa = 0.0, omega = 0.0;
+    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, omega = 0.0, deltaTime = 0.,strainRate = 0.;
 
     this->initTempStatus(gp);
 
     // subtract stress-independent part
     // note: eigenStrains (temperature) are present in strains stored in gp
     // therefore it is necessary to subtract always the total eigen strain value
+
     this->giveStressDependentPartOfStrainVector(reducedTotalStrainVector, gp, totalStrain, tStep, VM_Total);
-
-    //crossSection->giveFullCharacteristicVector(totalStrainVector, gp, reducedTotalStrainVector);
-
-    // compute equivalent strain
+   
     equivStrain = this->computeEquivalentStrain(reducedTotalStrainVector, gp, tStep);
 
-    if ( llcriteria == idm_strainLevelCR ) {
-        // compute value of loading function if strainLevel crit apply
-        f = equivStrain - status->giveKappa();
-double rateFactor = 1;
-        if ( f <= 0.0 ) {
-            // damage does not grow
-            tempKappa = status->giveKappa();
-            omega     = status->giveDamage();
-        } else {
-            // damage grows
-            //tempKappa = equivStrain;
-            rateFactor = computeRateFactor(reducedTotalStrainVector, 0, gp, tStep);
-            tempKappa = f/rateFactor + status->giveKappa();
-            this->initDamaged(tempKappa, reducedTotalStrainVector, gp);
-            // evaluate damage parameter
-            omega = this->computeDamageParam(tempKappa, reducedTotalStrainVector, gp);
-        }
-    } else if ( llcriteria == idm_damageLevelCR ) {
-        // evaluate damage parameter first
-        tempKappa = equivStrain;
-        this->initDamaged(tempKappa, reducedTotalStrainVector, gp);
-        omega = this->computeDamageParam(tempKappa, reducedTotalStrainVector, gp);
-        if ( omega < status->giveDamage() ) {
-            // unloading takes place
-            omega = status->giveDamage();
-        }
+    FloatArray oldReducedStrain = status->giveReducedStrain();
+    
+    //Peter: computeEquivalentStrain again. However, this time from the old strain.
+    oldEquivStrain = this->computeEquivalentStrain(oldReducedStrain, gp, tStep);    
+    
+    f = equivStrain - status->giveKappa();
+    double rateFactor = 1;
+    if ( f <= 0.0 ) {
+      // damage does not grow
+      tempKappa = status->giveKappa();
+      omega     = status->giveDamage();
     } else {
-        OOFEM_ERROR("unsupported loading/unloading criterion");
+      // damage grows
+      //Calculate strain rate.
+      if ( tStep->giveTimeIncrement() == 0 ) { //Problem with the first step. For some reason the time increment is zero
+	deltaTime = 1.;
+        } else {
+            deltaTime = tStep->giveTimeIncrement();
+        }
+      //This needs to be extended to cracking!
+      strainRate = (equivStrain-oldEquivStrain)/deltaTime;
+      rateFactor = computeRateFactor(strainRate, gp, tStep);     
+
+      printf("strainRate = %e, rateFactor = %e\n", strainRate, rateFactor);
+      
+      tempKappa = f/rateFactor + status->giveKappa();
+      this->initDamaged(tempKappa, reducedTotalStrainVector, gp);
+
+      // evaluate damage parameter
+      omega = this->computeDamageParam(tempKappa, reducedTotalStrainVector, gp);
     }
-
-
+    
     lmat->giveStiffnessMatrix(de, SecantStiffness, gp, tStep);
-    //mj
-    // permanent strain - so far implemented only in 1D
-    if ( permStrain && reducedTotalStrainVector.giveSize() == 1 ) {
-        double epsp = evaluatePermanentStrain(tempKappa, omega);
-        reducedTotalStrainVector.at(1) -= epsp;
-    }
-    // damage deactivation in compression for 1D model
+
+
     if ( ( reducedTotalStrainVector.giveSize() > 1 ) || ( reducedTotalStrainVector.at(1) > 0. ) ) {
         //emj
         de.times(1.0 - omega);
@@ -154,10 +148,12 @@ double rateFactor = 1;
     answer.beProductOf(de, reducedTotalStrainVector);
 
     // update gp
+    status->letTempReducedStrainBe(reducedTotalStrainVector);
     status->letTempStrainVectorBe(totalStrain);
     status->letTempStressVectorBe(answer);
     status->setTempKappa(tempKappa);
     status->setTempDamage(omega);
+
 #ifdef keep_track_of_dissipated_energy
     status->computeWork(gp);
 #endif
@@ -165,29 +161,16 @@ double rateFactor = 1;
 
 
 double
-IDM1Rate ::computeRateFactor(FloatArray &strain,
-			     double alpha,
+IDM1Rate ::computeRateFactor(double strainRate,
 			     GaussPoint *gp,
 			     TimeStep *tStep) const
 {
-
-    // Peter: I don't think that you need to have multiple strain rate factors. Tension is sufficient, since the model uses only one damage variable. Also, I suggest to have the strain as an input into the function (as it is done above), because reduced strain is not stored in the status of imd1rate.
+  double rateFactor = 1.;
+  
     if ( this->strengthRateType == 0 ) {
         return 1;
     }
 
-    auto status = static_cast<IsotropicDamageMaterialStatus *>( this->giveStatus( gp ) );
-
-    // Determine the principal values of the strain
-    auto principalStrain = StructuralMaterial::computePrincipalValues( from_voigt_strain( strain ) ); ///@todo CHECK
-
-    double strainRate;
-
-    strainRate = ( principalStrain - status->giveprincipalStrain() ) / tStep;
-
-    double rateFactor = 1.;
-
-    // Peter: Add here the calculation of the rate factor
     double strainRateRatio = strainRate / 1.e-6;
 
     if ( this->strengthRateType == 1 ) {
@@ -210,5 +193,88 @@ IDM1Rate ::computeRateFactor(FloatArray &strain,
 }
 
 
+
+MaterialStatus *
+IDM1Rate :: CreateStatus(GaussPoint *gp) const
+{
+    return new IDM1RateStatus(gp);
 }
-// end namespace oofem
+
+MaterialStatus *
+IDM1Rate :: giveStatus(GaussPoint *gp) const
+{
+    MaterialStatus *status = static_cast< MaterialStatus * >( gp->giveMaterialStatus() );
+    if ( status == nullptr ) {
+        // create a new one
+        status = this->CreateStatus(gp);
+
+        if ( status ) {
+            gp->setMaterialStatus(status);
+            this->_generateStatusVariables(gp);
+        }
+    }
+
+    return status;
+}
+
+  
+  IDM1RateStatus :: IDM1RateStatus(GaussPoint *g) : IsotropicDamageMaterial1Status(g), reducedStrain(), tempReducedStrain()
+{
+  
+    int rsize = IDM1Rate :: giveSizeOfVoigtSymVector( gp->giveMaterialMode() );
+    reducedStrain.resize(rsize);
+
+    // reset temp vars.
+    tempReducedStrain = reducedStrain;
+}
+
+void
+IDM1RateStatus :: initTempStatus()
+{
+    IsotropicDamageMaterial1Status :: initTempStatus();
+    this->tempReducedStrain = this->reducedStrain;
+}
+
+
+void
+IDM1RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
+{
+    // Call corresponding function of the parent class to print
+    IsotropicDamageMaterial1Status::printOutputAt(file, tStep);
+}
+  
+void
+IDM1RateStatus :: updateYourself(TimeStep *tStep)
+{
+    IsotropicDamageMaterial1Status :: updateYourself(tStep);
+    this->reducedStrain = this->tempReducedStrain;
+}
+
+
+void
+IDM1RateStatus :: saveContext(DataStream &stream, ContextMode mode)
+{
+    IsotropicDamageMaterial1Status :: saveContext(stream, mode);
+
+    contextIOResultType iores;
+    
+    if ( ( iores = reducedStrain.storeYourself(stream) ) != CIO_OK ) {
+        THROW_CIOERR(iores);
+    }
+
+}
+
+void
+IDM1RateStatus :: restoreContext(DataStream &stream, ContextMode mode)
+{
+    IsotropicDamageMaterial1Status :: restoreContext(stream, mode);
+
+    contextIOResultType iores;
+    
+    if ( ( iores = reducedStrain.restoreYourself(stream) ) != CIO_OK ) {
+        THROW_CIOERR(iores);
+    }    
+
+}
+  
+}// end namespace oofem
