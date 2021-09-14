@@ -62,15 +62,40 @@ namespace oofem {
  */
   class IDM1RateStatus : public IsotropicDamageMaterial1Status
 {
-public:
+
+ protected:
+    
+  FloatArray reducedStrain;
+  FloatArray tempReducedStrain;
+
+ public:
     /// Constructor
     IDM1RateStatus(GaussPoint *g);
 
+    void updateYourself(TimeStep *tStep) override;
+    void initTempStatus() override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
+
+
+
+    
     const char *giveClassName() const override { return "IDM1RateStatus"; }
 
-    Interface *giveInterface(InterfaceType it) override;
+    /**
+     * Get the reduced strain vector from the material status.
+     * @return Strain vector.
+     */
+    const FloatArray &giveReducedStrain() const { return reducedStrain; }
+   
+    void letTempReducedStrainBe(const FloatArray &v)
+    { tempReducedStrain = v; }
+    
 };
 
+
+  
 /**
  * This class implements rate dependence for idm1
  * @author: Xiaowei Liu, Peter Grassl
@@ -99,7 +124,12 @@ public:
     void giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 				      const FloatArray &reducedStrain, TimeStep *tStep) override;
     
-    double computeRateFactor(FloatArray &strain, double alpha, GaussPoint *gp, TimeStep *deltaTime) const;
+    double computeRateFactor(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
+
+    
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override;
+    MaterialStatus *giveStatus(GaussPoint *gp) const override;
+
     
 protected:
 
