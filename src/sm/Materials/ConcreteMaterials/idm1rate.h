@@ -68,6 +68,11 @@ namespace oofem {
   FloatArray reducedStrain;
   FloatArray tempReducedStrain;
 
+  double kappaOne = 0.;
+  double kappaTwo = 0.;
+  double tempKappaOne = 0.;
+  double tempKappaTwo = 0.;
+
  public:
     /// Constructor
     IDM1RateStatus(GaussPoint *g);
@@ -78,6 +83,12 @@ namespace oofem {
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
 
+    double giveKappaOne() const { return kappaOne; }
+    double giveKappaTwo() const { return kappaTwo; }
+    double giveTempKappaOne() const { return tempKappaOne; }
+    double giveTempKappaTwo() const { return tempKappaTwo; }
+    void setTempKappaOne(double newKappaOne) { tempKappaOne = newKappaOne; }
+    void setTempKappaTwo(double newKappaTwo) { tempKappaTwo = newKappaTwo; }
 
 
     
@@ -124,6 +135,8 @@ public:
     void giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 				      const FloatArray &reducedStrain, TimeStep *tStep) override;
     
+    double computeDamageParameter(const double tempKappa, double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const;
+
     double computeRateFactor(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
 
     
