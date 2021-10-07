@@ -35,15 +35,6 @@
 #ifndef idm1rate_h
 #define idm1rate_h
 
-/**
- * Select the mapping algorithm. The IDM_USE_MMAShapeFunctProjection does not work, since
- * this mapper does not preserve the max. property of damage and equivalent strain.
- */
-
-/*
- * Selects the use of mapped strain or projected strain from element.
- */
-
 #include "material.h"
 #include "sm/Materials/linearelasticmaterial.h"
 #include "sm/Materials/ConcreteMaterials/idm1.h"
@@ -55,25 +46,24 @@
 
 
 namespace oofem {
-
 /**
  * This class implements associated Material Status to IDM1Rate.
  * Stores the characteristic length of the element.
+ * @author: Xiaowei Liu, Peter Grassl
  */
-  class IDM1RateStatus : public IsotropicDamageMaterial1Status
+class IDM1RateStatus : public IsotropicDamageMaterial1Status
 {
+protected:
 
- protected:
-    
-  FloatArray reducedStrain;
-  FloatArray tempReducedStrain;
+    FloatArray reducedStrain;
+    FloatArray tempReducedStrain;
 
-  double kappaOne = 0.;
-  double kappaTwo = 0.;
-  double tempKappaOne = 0.;
-  double tempKappaTwo = 0.;
+    double kappaOne = 0.;
+    double kappaTwo = 0.;
+    double tempKappaOne = 0.;
+    double tempKappaTwo = 0.;
 
- public:
+public:
     /// Constructor
     IDM1RateStatus(GaussPoint *g);
 
@@ -91,7 +81,7 @@ namespace oofem {
     void setTempKappaTwo(double newKappaTwo) { tempKappaTwo = newKappaTwo; }
 
 
-    
+
     const char *giveClassName() const override { return "IDM1RateStatus"; }
 
     /**
@@ -99,14 +89,13 @@ namespace oofem {
      * @return Strain vector.
      */
     const FloatArray &giveReducedStrain() const { return reducedStrain; }
-   
+
     void letTempReducedStrainBe(const FloatArray &v)
     { tempReducedStrain = v; }
-    
 };
 
 
-  
+
 /**
  * This class implements rate dependence for idm1
  * @author: Xiaowei Liu, Peter Grassl
@@ -115,13 +104,13 @@ class IDM1Rate : public IsotropicDamageMaterial1
 {
 protected:
 
-  /** Type of strength strain rate dependence used.
-   * 0 = no strain rate (default)
-   * 1 = Model Code 2010 initial branch of strain rate effect for strength
-   * 2 = Model Code 2010 initial and second branch of strain rate effect for strength
-   */
-  int strengthRateType = 0;
-  
+    /** Type of strength strain rate dependence used.
+     * 0 = no strain rate (default)
+     * 1 = Model Code 2010 initial branch of strain rate effect for strength
+     * 2 = Model Code 2010 initial and second branch of strain rate effect for strength
+     */
+    int strengthRateType = 0;
+
 public:
     /// Constructor
     IDM1Rate(int n, Domain *d);
@@ -129,23 +118,22 @@ public:
     virtual ~IDM1Rate();
 
     const char *giveClassName() const override { return "IDM1Rate"; }
-    
+
     void initializeFrom(InputRecord &ir) override;
 
     void giveRealStressVector(FloatArray &answer, GaussPoint *gp,
-				      const FloatArray &reducedStrain, TimeStep *tStep) override;
-    
-    double computeDamageParameter(const double tempKappa, double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const;
+                              const FloatArray &reducedStrain, TimeStep *tStep) override;
+
+    double computeDamageParameter(double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const;
 
     double computeRateFactor(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
 
-    
+
     MaterialStatus *CreateStatus(GaussPoint *gp) const override;
     MaterialStatus *giveStatus(GaussPoint *gp) const override;
 
-    
-protected:
 
+protected:
 };
 } // end namespace oofem
 #endif // idm1rate_h

@@ -52,36 +52,31 @@ namespace oofem {
 REGISTER_Material(IDM1Rate);
 
 
-IDM1Rate :: IDM1Rate(int n, Domain *d) : IsotropicDamageMaterial1(n, d)
-{
-
-}
+IDM1Rate::IDM1Rate(int n, Domain *d) : IsotropicDamageMaterial1(n, d)
+{}
 
 
-IDM1Rate :: ~IDM1Rate()
-{
-
-}
+IDM1Rate::~IDM1Rate()
+{}
 
 void
-IDM1Rate :: initializeFrom(InputRecord &ir)
+IDM1Rate::initializeFrom(InputRecord &ir)
 {
-  IsotropicDamageMaterial1 :: initializeFrom(ir);
+    IsotropicDamageMaterial1::initializeFrom(ir);
 
-  this->strengthRateType = 0;
-  IR_GIVE_OPTIONAL_FIELD(ir, this->strengthRateType, _IFT_IDM1Rate_strengthratetype);
-  if ( this->strengthRateType < 0 || this->strengthRateType > 2 ) {
-    OOFEM_ERROR("strengthRateType not implemented. Must be 0, 1 or 2\n");
-  }
-
+    this->strengthRateType = 0;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->strengthRateType, _IFT_IDM1Rate_strengthratetype);
+    if ( this->strengthRateType < 0 || this->strengthRateType > 2 ) {
+        OOFEM_ERROR("strengthRateType not implemented. Must be 0, 1 or 2\n");
+    }
 }
 
 
 
 void
-IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
-                                                const FloatArray &totalStrain,
-                                                TimeStep *tStep)
+IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
+                               const FloatArray &totalStrain,
+                               TimeStep *tStep)
 //
 // returns real stress vector in 3d stress space of receiver according to
 // previous level of stress and current
@@ -93,7 +88,7 @@ IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     LinearElasticMaterial *lmat = this->giveLinearElasticMaterial();
     FloatArray reducedTotalStrainVector;
     FloatMatrix de;
-    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, omega = 0.0, deltaTime = 0.,strainRate = 0.;
+    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., strainRate = 0.;
 
     this->initTempStatus(gp);
 
@@ -102,54 +97,52 @@ IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     // therefore it is necessary to subtract always the total eigen strain value
 
     this->giveStressDependentPartOfStrainVector(reducedTotalStrainVector, gp, totalStrain, tStep, VM_Total);
-   
+
     equivStrain = this->computeEquivalentStrain(reducedTotalStrainVector, gp, tStep);
 
     FloatArray oldReducedStrain = status->giveReducedStrain();
-    
+
     //Peter: computeEquivalentStrain again. However, this time from the old strain.
-    oldEquivStrain = this->computeEquivalentStrain(oldReducedStrain, gp, tStep);    
+    oldEquivStrain = this->computeEquivalentStrain(oldReducedStrain, gp, tStep);
 
     f = equivStrain - status->giveKappa();
     double rateFactor;
     if ( f <= 0.0 ) {
-      // damage does not grow
-      tempKappa = status->giveKappa();
-      omega     = status->giveDamage();
-    }
-    else {
-      // damage grows
-      //Calculate strain rate.
-      if ( tStep->giveTimeIncrement() == 0 ) { //Problem with the first step. For some reason the time increment is zero
-	deltaTime = 1.;
+        // damage does not grow
+        tempKappa = status->giveKappa();
+        tempKappaOne = status->giveKappaOne();
+        tempKappaTwo = status->giveKappaTwo();
+        omega     = status->giveDamage();
+    } else   {
+        // damage grows
+        //Calculate strain rate.
+        if ( tStep->giveTimeIncrement() == 0 ) { //Problem with the first step. For some reason the time increment is zero
+            deltaTime = 1.;
         } else {
             deltaTime = tStep->giveTimeIncrement();
         }
-      //This needs to be extended to cracking!
-      strainRate = (equivStrain-oldEquivStrain)/deltaTime;
-      rateFactor = computeRateFactor(strainRate, gp, tStep);     
+	
+        //This needs to be extended to cracking!
+        strainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
 
-      printf("strainRate = %e, rateFactor = %e\n", strainRate, rateFactor);
-      
-      tempKappa = f + status->giveKappa();
-      double kappaOne;
-      double kappaTwo;
-      double tempKappaOne = status->giveKappaOne() + (tempKappa - status->giveKappa() ) / rateFactor;
-      double tempKappaTwo = status->giveKappaTwo() + (tempKappa - status->giveKappa()) * rateFactor;
-      this->initDamaged(tempKappa, reducedTotalStrainVector, gp);
+	rateFactor = computeRateFactor(strainRate, gp, tStep);
 
-      // evaluate damage parameter
-      //omega = this->computeDamageParam(tempKappa, reducedTotalStrainVector, gp);
+        printf("strainRate = %e, rateFactor = %e\n", strainRate, rateFactor);
 
-      omega = computeDamageParameter(tempKappa, tempKappaOne, tempKappaTwo, gp);
+        tempKappa = f + status->giveKappa();
+        tempKappaOne = status->giveKappaOne() + f / rateFactor;
+        tempKappaTwo = status->giveKappaTwo() + f * rateFactor;
+	
+        this->initDamaged(tempKappaOne, reducedTotalStrainVector, gp);
 
+        omega = computeDamageParameter(tempKappaOne, tempKappaTwo, gp);
     }
-    
+
     lmat->giveStiffnessMatrix(de, SecantStiffness, gp, tStep);
 
 
     if ( ( reducedTotalStrainVector.giveSize() > 1 ) || ( reducedTotalStrainVector.at(1) > 0. ) ) {
-        //emj
+
         de.times(1.0 - omega);
     }
 
@@ -160,6 +153,8 @@ IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     status->letTempStrainVectorBe(totalStrain);
     status->letTempStressVectorBe(answer);
     status->setTempKappa(tempKappa);
+    status->setTempKappaOne(tempKappaOne);
+    status->setTempKappaTwo(tempKappaTwo);
     status->setTempDamage(omega);
 
 #ifdef keep_track_of_dissipated_energy
@@ -168,14 +163,14 @@ IDM1Rate :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 }
 
 double
-IDM1Rate :: computeDamageParameter(double tempKappa, double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const
+IDM1Rate::computeDamageParameter(double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const
 {
     const double e0 = this->give(e0_ID, gp);  // e0 is the strain at the peak stress
     const double E = this->linearElasticMaterial->give('E', gp);
     const double gf = this->give(gf_ID, gp);
     double wf = this->give(wf_ID, gp);     // wf is the crack opening
     double omega = 0.0;
-    if ( tempKappa > e0 ) {
+    if ( tempKappaOne > e0 ) {
         if ( this->gf != 0. ) { //cohesive crack model
             if ( softType == ST_Exponential_Cohesive_Crack ) { // exponential softening
                 wf = this->gf / E / e0; // wf is the crack opening
@@ -215,8 +210,8 @@ IDM1Rate :: computeDamageParameter(double tempKappa, double tempKappaOne, double
         }
 
         if ( this->softType == ST_Linear_Cohesive_Crack ) {
-            if ( tempKappa < ef ) {
-                omega = ( ef / tempKappaOne ) * ( tempKappaTwo - e0 ) / ( ef - e0 );
+            if ( tempKappaOne < ef ) {
+                omega = ef * ( tempKappaOne - e0 ) / ( ef * tempKappaOne - e0 * tempKappaTwo );
             } else {
                 omega = 1.0; //maximum omega (maxOmega) is adjusted just for stiffness matrix in isodamagemodel.C
             }
@@ -242,11 +237,11 @@ IDM1Rate :: computeDamageParameter(double tempKappa, double tempKappaOne, double
                 OOFEM_WARNING("ek %f is not between e0 %f and ef %f", ek, e0, ef);
             }
 
-            if ( tempKappa <= ek ) {
+            if ( tempKappaOne <= ek ) {
                 omega = 1.0 - ( ( e0 / tempKappaOne ) * ( ek - tempKappaTwo ) / ( ek - e0 ) + ( ( sigmak / ( E * tempKappaOne ) ) * ( tempKappaTwo - e0 ) / ( ek - e0 ) ) );
-            } else if ( tempKappa > ek && tempKappa <= epsf ) {
+            } else if ( tempKappaOne > ek && tempKappaOne <= epsf ) {
                 omega = 1.0 - ( ( sigmak / ( E * tempKappaOne ) ) * ( epsf - tempKappaTwo ) / ( epsf - ek ) );
-            } else if ( tempKappa <= e0 ) {
+            } else if ( tempKappaOne <= e0 ) {
                 omega = 0.0;
             } else {
                 omega = maxOmega;
@@ -262,8 +257,8 @@ IDM1Rate :: computeDamageParameter(double tempKappa, double tempKappaOne, double
             do {
                 nite++;
                 help = omega * tempKappaTwo / ef;
-                R = ( 1. - omega ) * tempKappaOne - e0 *exp(-help); //residuum
-                Lhs = tempKappaOne - e0 *exp(-help) * tempKappaOne / ef; //- dR / (d omega)
+                R = ( 1. - omega ) * tempKappaOne - e0 * exp(-help); //residuum
+                Lhs = tempKappaOne - e0 * exp(-help) * tempKappaTwo / ef; //- dR / (d omega)
                 omega += R / Lhs;
                 if ( nite > 40 ) {
                     OOFEM_ERROR("algorithm not converging");
@@ -290,18 +285,17 @@ IDM1Rate :: computeDamageParameter(double tempKappa, double tempKappaOne, double
         }
     }
     return omega;
-
 }
 
 
 
 double
-IDM1Rate ::computeRateFactor(double strainRate,
-			     GaussPoint *gp,
-			     TimeStep *tStep) const
+IDM1Rate::computeRateFactor(double strainRate,
+                            GaussPoint *gp,
+                            TimeStep *tStep) const
 {
-  double rateFactor = 1.;
-  
+    double rateFactor = 1.;
+
     if ( this->strengthRateType == 0 ) {
         return 1;
     }
@@ -312,15 +306,15 @@ IDM1Rate ::computeRateFactor(double strainRate,
         if ( strainRate < 1.e-6 ) {
             rateFactor = 1.;
         } else if ( 1.e-6 < strainRate ) {
-            rateFactor = pow( strainRateRatio, 0.018 );
+            rateFactor = pow(strainRateRatio, 0.018);
         }
     } else if ( this->strengthRateType == 2 ) {
         if ( strainRate < 1.e-6 ) {
             rateFactor = 1.;
         } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
-            rateFactor = pow( strainRateRatio, 0.018 );
+            rateFactor = pow(strainRateRatio, 0.018);
         } else {
-            rateFactor = 0.0062 * pow( strainRateRatio, 1. / 3. );
+            rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
         }
     }
 
@@ -328,15 +322,14 @@ IDM1Rate ::computeRateFactor(double strainRate,
 }
 
 
-
 MaterialStatus *
-IDM1Rate :: CreateStatus(GaussPoint *gp) const
+IDM1Rate::CreateStatus(GaussPoint *gp) const
 {
     return new IDM1RateStatus(gp);
 }
 
 MaterialStatus *
-IDM1Rate :: giveStatus(GaussPoint *gp) const
+IDM1Rate::giveStatus(GaussPoint *gp) const
 {
     MaterialStatus *status = static_cast< MaterialStatus * >( gp->giveMaterialStatus() );
     if ( status == nullptr ) {
@@ -352,11 +345,10 @@ IDM1Rate :: giveStatus(GaussPoint *gp) const
     return status;
 }
 
-  
-  IDM1RateStatus :: IDM1RateStatus(GaussPoint *g) : IsotropicDamageMaterial1Status(g), reducedStrain(), tempReducedStrain()
+
+IDM1RateStatus::IDM1RateStatus(GaussPoint *g) : IsotropicDamageMaterial1Status(g), reducedStrain(), tempReducedStrain()
 {
-  
-    int rsize = IDM1Rate :: giveSizeOfVoigtSymVector( gp->giveMaterialMode() );
+    int rsize = IDM1Rate::giveSizeOfVoigtSymVector(gp->giveMaterialMode() );
     reducedStrain.resize(rsize);
 
     // reset temp vars.
@@ -364,10 +356,12 @@ IDM1Rate :: giveStatus(GaussPoint *gp) const
 }
 
 void
-IDM1RateStatus :: initTempStatus()
+IDM1RateStatus::initTempStatus()
 {
-    IsotropicDamageMaterial1Status :: initTempStatus();
+    IsotropicDamageMaterial1Status::initTempStatus();
     this->tempReducedStrain = this->reducedStrain;
+    this->tempKappaOne = this->kappaOne;
+    this->tempKappaTwo = this->kappaTwo;
 }
 
 
@@ -376,40 +370,56 @@ IDM1RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
 {
     // Call corresponding function of the parent class to print
     IsotropicDamageMaterial1Status::printOutputAt(file, tStep);
+    fprintf(file, "kappaOne %f kappaTwo %f", this->kappaOne, this->kappaTwo);
 }
-  
+
 void
-IDM1RateStatus :: updateYourself(TimeStep *tStep)
+IDM1RateStatus::updateYourself(TimeStep *tStep)
 {
-    IsotropicDamageMaterial1Status :: updateYourself(tStep);
+    IsotropicDamageMaterial1Status::updateYourself(tStep);
     this->reducedStrain = this->tempReducedStrain;
+    this->kappaOne = this->tempKappaOne;
+    this->kappaTwo = this->tempKappaTwo;
 }
 
 
 void
-IDM1RateStatus :: saveContext(DataStream &stream, ContextMode mode)
+IDM1RateStatus::saveContext(DataStream &stream, ContextMode mode)
 {
-    IsotropicDamageMaterial1Status :: saveContext(stream, mode);
+    IsotropicDamageMaterial1Status::saveContext(stream, mode);
 
     contextIOResultType iores;
-    
+
     if ( ( iores = reducedStrain.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
 
+    if ( !stream.write(kappaOne) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaTwo) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
 }
 
 void
-IDM1RateStatus :: restoreContext(DataStream &stream, ContextMode mode)
+IDM1RateStatus::restoreContext(DataStream &stream, ContextMode mode)
 {
-    IsotropicDamageMaterial1Status :: restoreContext(stream, mode);
+    IsotropicDamageMaterial1Status::restoreContext(stream, mode);
 
     contextIOResultType iores;
-    
+
     if ( ( iores = reducedStrain.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
-    }    
+    }
 
+    if ( !stream.read(kappaOne) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(kappaTwo) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
 }
-  
 }// end namespace oofem
