@@ -88,7 +88,7 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     LinearElasticMaterial *lmat = this->giveLinearElasticMaterial();
     FloatArray reducedTotalStrainVector;
     FloatMatrix de;
-    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., strainRate = 0.;
+    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., strainRate = 0., crackopening = 0., oldcrackopening = 0., crackopeningrate, Le;
 
     this->initTempStatus(gp);
 
@@ -125,7 +125,7 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
         //This needs to be extended to cracking!
         strainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
 
-	rateFactor = computeRateFactor(strainRate, gp, tStep);
+        rateFactor = computeRateFactor(strainRate, crackopeningrate,gp, tStep);
 
         printf("strainRate = %e, rateFactor = %e\n", strainRate, rateFactor);
 
@@ -147,6 +147,12 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     }
 
     answer.beProductOf(de, reducedTotalStrainVector);
+    //auto status = static_cast< IsotropicDamageMaterial1Status * >( this->giveStatus(gp) );
+    Le = status->giveLe();
+    crackopening = Le * status->giveDamage() * equivStrain;
+    oldcrackopening = Le * omega * oldEquivStrain;
+    crackopeningrate = (crackopening-oldcrackopening) / deltaTime;
+
 
     // update gp
     status->letTempReducedStrainBe(reducedTotalStrainVector);
@@ -156,6 +162,7 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     status->setTempKappaOne(tempKappaOne);
     status->setTempKappaTwo(tempKappaTwo);
     status->setTempDamage(omega);
+
 
 #ifdef keep_track_of_dissipated_energy
     status->computeWork(gp);
@@ -290,19 +297,29 @@ IDM1Rate::computeDamageParameter(double tempKappaOne, double tempKappaTwo, Gauss
 
 
 double
-IDM1Rate::computeRateFactor(double strainRate,
+IDM1Rate::computeRateFactor(double strainRate, double crackopeningrate,
                             GaussPoint *gp,
                             TimeStep *tStep) const
 {
+    double beta, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0;
+
+
     double rateFactor = 1.;
 
     if ( this->strengthRateType == 0 ) {
         return 1;
     }
 
+
+    omega = computeDamageParameter(tempKappaOne, tempKappaTwo, gp);
+
+    if ( omega > 0 ) {
+        beta = strainRate / crackopeningrate;
+    }
+
     double strainRateRatio = strainRate / 1.e-6;
 
-    if ( this->strengthRateType == 1 ) {
+ /*   if ( this->strengthRateType == 1 ) {
         if ( strainRate < 1.e-6 ) {
             rateFactor = 1.;
         } else if ( 1.e-6 < strainRate ) {
@@ -317,7 +334,34 @@ IDM1Rate::computeRateFactor(double strainRate,
             rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
         }
     }
-
+*/
+ if ( this->strengthRateType == 1 ) {
+     if ( strainRate < 1.e-6 ) {
+         rateFactor = 1.;
+     } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
+         rateFactor = pow(strainRateRatio, 0.018);
+     } else {
+         rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
+     }
+ }else if ( this->strengthRateType == 2 ) {
+     if (omega > 0) {
+         if ( strainRate < 1.e-6 ) {
+             rateFactor = 1.;
+         } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
+             rateFactor = pow( beta * crackopeningrate, 0.018 );
+         } else {
+             rateFactor = 0.0062 * pow( beta * crackopeningrate, 1. / 3. );
+         }
+     } else {
+         if ( strainRate < 1.e-6 ) {
+             rateFactor = 1.;
+         } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
+             rateFactor = pow(strainRateRatio, 0.018);
+         } else {
+             rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
+         }
+     }
+ }
     return rateFactor;
 }
 

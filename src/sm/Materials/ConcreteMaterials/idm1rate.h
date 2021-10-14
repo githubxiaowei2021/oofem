@@ -106,8 +106,8 @@ protected:
 
     /** Type of strength strain rate dependence used.
      * 0 = no strain rate (default)
-     * 1 = Model Code 2010 initial branch of strain rate effect for strength
-     * 2 = Model Code 2010 initial and second branch of strain rate effect for strength
+     * 1 = Model Code 2010 initial and second branch of strain rate effect for strength
+     * 2 = Substitute crack opening for strain rate
      */
     int strengthRateType = 0;
 
@@ -126,7 +126,7 @@ public:
 
     double computeDamageParameter(double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const;
 
-    double computeRateFactor(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
+    double computeRateFactor(const double strainRate, double crackopeningrate,GaussPoint *gp, TimeStep *deltaTime) const;
 
 
     MaterialStatus *CreateStatus(GaussPoint *gp) const override;
