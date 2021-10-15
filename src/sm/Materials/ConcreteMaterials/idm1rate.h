@@ -63,6 +63,16 @@ protected:
     double tempKappaOne = 0.;
     double tempKappaTwo = 0.;
 
+    double beta = 0.;
+    double tempBeta = 0.;
+
+    double strainRate = 0.;
+    double tempStrainRate = 0.;
+       
+    double rateFactor = 0.;
+    double tempRateFactor = 0.;
+
+
 public:
     /// Constructor
     IDM1RateStatus(GaussPoint *g);
@@ -75,12 +85,21 @@ public:
 
     double giveKappaOne() const { return kappaOne; }
     double giveKappaTwo() const { return kappaTwo; }
-    double giveTempKappaOne() const { return tempKappaOne; }
+    double giveBeta() const { return beta;}
+    double giveStrainRate() const {return strainRate;}    
+    double giveRateFactor() const {return rateFactor;}
+    
+    double giveTempKappaOne() const { return tempKappaOne; }   
     double giveTempKappaTwo() const { return tempKappaTwo; }
+    double giveTempBeta() const { return tempBeta;}
+    double giveTempStrainRate() const { return tempStrainRate;}
+    double giveTempRateFactor() const { return tempRateFactor;}
+    
     void setTempKappaOne(double newKappaOne) { tempKappaOne = newKappaOne; }
     void setTempKappaTwo(double newKappaTwo) { tempKappaTwo = newKappaTwo; }
-
-
+    void setTempBeta(double newBeta) { tempBeta = newBeta; }
+    void setTempStrainRate(double newStrainRate) { tempStrainRate = newStrainRate; }
+    void setTempRateFactor(double newRateFactor) { tempRateFactor = newRateFactor; }
 
     const char *giveClassName() const override { return "IDM1RateStatus"; }
 
@@ -126,7 +145,7 @@ public:
 
     double computeDamageParameter(double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const;
 
-    double computeRateFactor(const double strainRate, double crackopeningrate,GaussPoint *gp, TimeStep *deltaTime) const;
+    double computeRateFactor(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
 
 
     MaterialStatus *CreateStatus(GaussPoint *gp) const override;
