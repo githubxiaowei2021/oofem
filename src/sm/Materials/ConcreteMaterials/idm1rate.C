@@ -88,8 +88,9 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     LinearElasticMaterial *lmat = this->giveLinearElasticMaterial();
     FloatArray reducedTotalStrainVector;
     FloatMatrix de;
-    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., strainRate = 0., crackopening = 0., oldcrackopening = 0., crackopeningrate, Le;
+    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., strainRate = 0., crackopening = 0., oldcrackopening = 0., crackopeningrate, Le, tempBeta = 0.,rateFactor = 1.;
 
+    
     this->initTempStatus(gp);
 
     // subtract stress-independent part
@@ -106,7 +107,7 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     oldEquivStrain = this->computeEquivalentStrain(oldReducedStrain, gp, tStep);
 
     f = equivStrain - status->giveKappa();
-    double rateFactor;
+
     if ( f <= 0.0 ) {
         // damage does not grow
         tempKappa = status->giveKappa();
@@ -122,12 +123,36 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
             deltaTime = tStep->giveTimeIncrement();
         }
 	
-        //This needs to be extended to cracking!
-        strainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
+	
+	if ( this->strengthRateType == 0 ) {
+	  rateFactor = 1;
+	}
+	else if (this->strengthRateType == 1){
+	  //Old mesh dependent approach
+	  strainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
+	  rateFactor = computeRateFactor(strainRate,gp, tStep);       
+	}
+	else if (this->strengthRateType == 2){
+	//New approach
+	  if(status->giveTempDamage() == 0){
+	    strainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
+	    rateFactor = computeRateFactor(strainRate,gp, tStep);
+	  }
+	  else{
+	    tempBeta = status->giveTempBeta();
+	    if(tempBeta == 0){
+	      printf("Check beta \n");
+	      //Calculate tempBeta only when it was not calculated.
+	      tempBeta = 1./(status->giveTempDamage()*status->giveLe());
+	    }
+	      
+	    strainRate = status->giveTempBeta()*status->giveTempDamage()*status->giveLe()*
+	      ( equivStrain - oldEquivStrain ) / deltaTime;
+	    
+	    rateFactor = computeRateFactor(strainRate, gp, tStep);	  
+	  }
+	}
 
-        rateFactor = computeRateFactor(strainRate, crackopeningrate,gp, tStep);
-
-        printf("strainRate = %e, rateFactor = %e\n", strainRate, rateFactor);
 
         tempKappa = f + status->giveKappa();
         tempKappaOne = status->giveKappaOne() + f / rateFactor;
@@ -162,6 +187,9 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     status->setTempKappaOne(tempKappaOne);
     status->setTempKappaTwo(tempKappaTwo);
     status->setTempDamage(omega);
+    status->setTempBeta(tempBeta);
+    status->setTempRateFactor(rateFactor);
+    status->setTempStrainRate(strainRate);
 
 
 #ifdef keep_track_of_dissipated_energy
@@ -172,21 +200,21 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 double
 IDM1Rate::computeDamageParameter(double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const
 {
-    const double e0 = this->give(e0_ID, gp);  // e0 is the strain at the peak stress
-    const double E = this->linearElasticMaterial->give('E', gp);
-    const double gf = this->give(gf_ID, gp);
+  const double e0 = this->give(e0_ID, gp);  // e0 is the strain at the peak stress
+  const double E = this->linearElasticMaterial->give('E', gp);
+  const double gf = this->give(gf_ID, gp);
     double wf = this->give(wf_ID, gp);     // wf is the crack opening
     double omega = 0.0;
     if ( tempKappaOne > e0 ) {
-        if ( this->gf != 0. ) { //cohesive crack model
-            if ( softType == ST_Exponential_Cohesive_Crack ) { // exponential softening
-                wf = this->gf / E / e0; // wf is the crack opening
-            } else if ( softType == ST_Linear_Cohesive_Crack || softType == ST_BiLinear_Cohesive_Crack ) { // (bi)linear softening law
-                wf = 2. * gf / E / e0; // wf is the crack opening
-            } else {
-                OOFEM_ERROR("Gf unsupported for softening type softType = %d", softType);
-            }
-        } else if ( softType == ST_BiLinear_Cohesive_Crack ) {
+      if ( this->gf != 0. ) { //cohesive crack model
+	if ( softType == ST_Exponential_Cohesive_Crack ) { // exponential softening
+	  wf = this->gf / E / e0; // wf is the crack opening
+	} else if ( softType == ST_Linear_Cohesive_Crack || softType == ST_BiLinear_Cohesive_Crack ) { // (bi)linear softening law
+	  wf = 2. * gf / E / e0; // wf is the crack opening
+	} else {
+	  OOFEM_ERROR("Gf unsupported for softening type softType = %d", softType);
+	}
+      } else if ( softType == ST_BiLinear_Cohesive_Crack ) {
             wf = this->wk / ( e0 * E - this->sk ) * ( e0 * E );
         }
 
@@ -297,71 +325,23 @@ IDM1Rate::computeDamageParameter(double tempKappaOne, double tempKappaTwo, Gauss
 
 
 double
-IDM1Rate::computeRateFactor(double strainRate, double crackopeningrate,
+IDM1Rate::computeRateFactor(double strainRate,
                             GaussPoint *gp,
                             TimeStep *tStep) const
 {
-    double beta, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0;
+  double rateFactor = 1.;
+  double strainRateRatio = strainRate / 1.e-6;
 
 
-    double rateFactor = 1.;
-
-    if ( this->strengthRateType == 0 ) {
-        return 1;
+    if ( strainRate < 1.e-6 ) {
+      rateFactor = 1.;
+    } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
+      rateFactor = pow(strainRateRatio, 0.018);
+    } else {
+      rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
     }
-
-
-    omega = computeDamageParameter(tempKappaOne, tempKappaTwo, gp);
-
-    if ( omega > 0 ) {
-        beta = strainRate / crackopeningrate;
-    }
-
-    double strainRateRatio = strainRate / 1.e-6;
-
- /*   if ( this->strengthRateType == 1 ) {
-        if ( strainRate < 1.e-6 ) {
-            rateFactor = 1.;
-        } else if ( 1.e-6 < strainRate ) {
-            rateFactor = pow(strainRateRatio, 0.018);
-        }
-    } else if ( this->strengthRateType == 2 ) {
-        if ( strainRate < 1.e-6 ) {
-            rateFactor = 1.;
-        } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
-            rateFactor = pow(strainRateRatio, 0.018);
-        } else {
-            rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
-        }
-    }
-*/
- if ( this->strengthRateType == 1 ) {
-     if ( strainRate < 1.e-6 ) {
-         rateFactor = 1.;
-     } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
-         rateFactor = pow(strainRateRatio, 0.018);
-     } else {
-         rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
-     }
- }else if ( this->strengthRateType == 2 ) {
-     if (omega > 0) {
-         if ( strainRate < 1.e-6 ) {
-             rateFactor = 1.;
-         } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
-             rateFactor = pow( beta * crackopeningrate, 0.018 );
-         } else {
-             rateFactor = 0.0062 * pow( beta * crackopeningrate, 1. / 3. );
-         }
-     } else {
-         if ( strainRate < 1.e-6 ) {
-             rateFactor = 1.;
-         } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
-             rateFactor = pow(strainRateRatio, 0.018);
-         } else {
-             rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
-         }
-     }
- }
+    
+    
     return rateFactor;
 }
 
@@ -406,6 +386,10 @@ IDM1RateStatus::initTempStatus()
     this->tempReducedStrain = this->reducedStrain;
     this->tempKappaOne = this->kappaOne;
     this->tempKappaTwo = this->kappaTwo;
+    this->tempBeta = this->beta;
+    this->tempStrainRate = this->strainRate;
+    this->tempRateFactor = this->rateFactor;
+    
 }
 
 
@@ -414,7 +398,7 @@ IDM1RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
 {
     // Call corresponding function of the parent class to print
     IsotropicDamageMaterial1Status::printOutputAt(file, tStep);
-    fprintf(file, "kappaOne %f kappaTwo %f", this->kappaOne, this->kappaTwo);
+    fprintf(file, "kappaOne %f kappaTwo %f beta %f strainRate %f rateFactor %f\n", this->kappaOne, this->kappaTwo, this->beta, this->strainRate, this->rateFactor);
 }
 
 void
@@ -424,6 +408,9 @@ IDM1RateStatus::updateYourself(TimeStep *tStep)
     this->reducedStrain = this->tempReducedStrain;
     this->kappaOne = this->tempKappaOne;
     this->kappaTwo = this->tempKappaTwo;
+    this->beta = this->tempBeta;
+    this->strainRate = this->tempStrainRate;
+    this->rateFactor = this->tempRateFactor;
 }
 
 
@@ -445,6 +432,19 @@ IDM1RateStatus::saveContext(DataStream &stream, ContextMode mode)
     if ( !stream.write(kappaTwo) ) {
         THROW_CIOERR(CIO_IOERR);
     }
+
+    if ( !stream.write(beta) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+    
+    if ( !stream.write(strainRate) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(rateFactor) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+    
 }
 
 void
@@ -465,5 +465,18 @@ IDM1RateStatus::restoreContext(DataStream &stream, ContextMode mode)
     if ( !stream.read(kappaTwo) ) {
         THROW_CIOERR(CIO_IOERR);
     }
+
+    if ( !stream.read(beta) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(strainRate) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(rateFactor) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+    
 }
 }// end namespace oofem
