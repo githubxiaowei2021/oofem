@@ -88,7 +88,7 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     LinearElasticMaterial *lmat = this->giveLinearElasticMaterial();
     FloatArray reducedTotalStrainVector;
     FloatMatrix de;
-    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., strainRate = 0., crackopening = 0., oldcrackopening = 0., crackopeningrate, Le, tempBeta = 0.,rateFactor = 1.;
+    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., tempStrainRate = 0., crackopening = 0., oldcrackopening = 0., crackopeningrate, Le, tempBeta = 0.,tempRateFactor = 1.;
 
     
     this->initTempStatus(gp);
@@ -125,42 +125,59 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 	
 	
 	if ( this->strengthRateType == 0 ) {
-	  rateFactor = 1;
+	  tempRateFactor = 1;
 	}
 	else if (this->strengthRateType == 1){
 	  //Old mesh dependent approach
-	  strainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
-	  rateFactor = computeRateFactor(strainRate,gp, tStep);       
+	  tempStrainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
+	  tempRateFactor = computeRateFactor(tempStrainRate,gp, tStep);       
 	}
 	else if (this->strengthRateType == 2){
-	//New approach
+	//New mesh independent approach
 	  if(status->giveTempDamage() == 0){
-	    strainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
-	    rateFactor = computeRateFactor(strainRate,gp, tStep);
+	    //Damage is zero
+	    tempStrainRate = ( equivStrain - oldEquivStrain ) / deltaTime;
+	    tempRateFactor = computeRateFactor(tempStrainRate,gp, tStep);
 	  }
 	  else{
+	    //Damage in previous step is not zero
 	    tempBeta = status->giveTempBeta();
 	    if(tempBeta == 0){
 	      printf("Check beta \n");
-	      //Calculate tempBeta only when it was not calculated.
-	      tempBeta = 1./(status->giveTempDamage()*status->giveLe());
+	      //Calculate tempBeta only once 
+	      tempBeta = status->giveStrainRate()/(status->giveTempDamage()*status->giveLe()*
+						   ( equivStrain - oldEquivStrain ) / deltaTime);
 	    }
 	      
-	    strainRate = status->giveTempBeta()*status->giveTempDamage()*status->giveLe()*
+	    tempStrainRate = tempBeta*status->giveTempDamage()*status->giveLe()*
 	      ( equivStrain - oldEquivStrain ) / deltaTime;
 	    
-	    rateFactor = computeRateFactor(strainRate, gp, tStep);	  
+	    tempRateFactor = computeRateFactor(tempStrainRate, gp, tStep);	  
 	  }
 	}
 
 
         tempKappa = f + status->giveKappa();
-        tempKappaOne = status->giveKappaOne() + f / rateFactor;
-        tempKappaTwo = status->giveKappaTwo() + f * rateFactor;
+        tempKappaOne = status->giveKappaOne() + f / tempRateFactor;
+        tempKappaTwo = status->giveKappaTwo() + f * tempRateFactor;
 	
         this->initDamaged(tempKappaOne, reducedTotalStrainVector, gp);
 
         omega = computeDamageParameter(tempKappaOne, tempKappaTwo, gp);
+
+
+	if(status->giveTempDamage() >0. && status->giveDamage() == 0.){
+	  //for strengthrate type 2 we need to check that we do not use the pre-damage rate factor
+	  //if damage has already started.
+	  //Access rateFactor from previous step and repeat damage calculation.
+	  tempKappaOne = status->giveKappaOne() + f / status->giveRateFactor();
+	  tempKappaTwo = status->giveKappaTwo() + f * status->giveRateFactor();
+	  
+	  this->initDamaged(tempKappaOne, reducedTotalStrainVector, gp);	  
+	  omega = computeDamageParameter(tempKappaOne, tempKappaTwo, gp);
+	  
+	}
+	
     }
 
     lmat->giveStiffnessMatrix(de, SecantStiffness, gp, tStep);
@@ -188,9 +205,8 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     status->setTempKappaTwo(tempKappaTwo);
     status->setTempDamage(omega);
     status->setTempBeta(tempBeta);
-    status->setTempRateFactor(rateFactor);
-    status->setTempStrainRate(strainRate);
-
+    status->setTempStrainRate(tempStrainRate);
+    status->setTempRateFactor(tempRateFactor);
 
 #ifdef keep_track_of_dissipated_energy
     status->computeWork(gp);
@@ -335,7 +351,7 @@ IDM1Rate::computeRateFactor(double strainRate,
 
     if ( strainRate < 1.e-6 ) {
       rateFactor = 1.;
-    } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
+    } else if ( 1.e-6 <= strainRate && strainRate < 10 ) {
       rateFactor = pow(strainRateRatio, 0.018);
     } else {
       rateFactor = 0.0062 * pow(strainRateRatio, 1. / 3.);
