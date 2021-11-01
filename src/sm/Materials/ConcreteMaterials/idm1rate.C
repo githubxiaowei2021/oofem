@@ -114,6 +114,8 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
         tempKappaOne = status->giveKappaOne();
         tempKappaTwo = status->giveKappaTwo();
         omega     = status->giveDamage();
+	tempRateFactor = status->giveRateFactor();
+	tempStrainRate = status->giveStrainRate();
     } else   {
         // damage grows
         //Calculate strain rate.
