@@ -145,11 +145,11 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 	    if(tempBeta == 0){
 	      printf("Check beta \n");
 	      //Calculate tempBeta only once 
-	      tempBeta = status->giveStrainRate()/(status->giveLe()*
-						    ( equivStrain - oldEquivStrain ) / deltaTime);
+	      tempBeta = status->giveStrainRate()/(status->giveTempDamage()*status->giveLe()*
+						   ( equivStrain - oldEquivStrain ) / deltaTime);
 	    }
 	      
-	    tempStrainRate = tempBeta * status->giveLe()*
+	    tempStrainRate = tempBeta*status->giveTempDamage()*status->giveLe()*
 	      ( equivStrain - oldEquivStrain ) / deltaTime;
 	    
 	    tempRateFactor = computeRateFactor(tempStrainRate, gp, tStep);	  
@@ -361,6 +361,25 @@ IDM1Rate::computeRateFactor(double strainRate,
     return rateFactor;
 }
 
+
+int
+IDM1Rate :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep)
+{
+    IDM1RateStatus *status = static_cast< IDM1RateStatus * >( this->giveStatus(gp) );
+    if ( type == IST_RateFactor ) {
+        answer.resize(1);
+        answer.zero();
+        answer.at(1) = status->giveRateFactor();
+        return 1;
+    } else {
+        return IsotropicDamageMaterial :: giveIPValue(answer, gp, type, tStep);
+    }
+
+    return 1; // to make the compiler happy
+}
+
+
+  
 
 MaterialStatus *
 IDM1Rate::CreateStatus(GaussPoint *gp) const
