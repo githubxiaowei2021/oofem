@@ -199,6 +199,7 @@ namespace oofem {
     ENUM_ITEM_WITH_VALUE(IST_ShearDeltaDissWork, 149) \
     ENUM_ITEM_WITH_VALUE(IST_CompressionDissWork, 150) \
     ENUM_ITEM_WITH_VALUE(IST_CompressionDeltaDissWork, 151)      
+    ENUM_ITEM_WITH_VALUE(IST_RateFactor, 152)
 
 /**
  * Type  representing the physical meaning of element or constitutive model internal variable.

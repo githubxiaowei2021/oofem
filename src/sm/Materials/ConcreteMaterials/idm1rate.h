@@ -145,6 +145,8 @@ public:
 
     double computeDamageParameter(double tempKappaOne, double tempKappaTwo, GaussPoint *gp) const;
 
+    int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
+    
     double computeRateFactor(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
 
 
