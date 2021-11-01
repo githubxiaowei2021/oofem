@@ -145,11 +145,11 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 	    if(tempBeta == 0){
 	      printf("Check beta \n");
 	      //Calculate tempBeta only once 
-	      tempBeta = status->giveStrainRate()/(status->giveTempDamage()*status->giveLe()*
-						   ( equivStrain - oldEquivStrain ) / deltaTime);
+	      tempBeta = status->giveStrainRate()/(status->giveLe()*
+						    ( equivStrain - oldEquivStrain ) / deltaTime);
 	    }
 	      
-	    tempStrainRate = tempBeta*status->giveTempDamage()*status->giveLe()*
+	    tempStrainRate = tempBeta * status->giveLe()*
 	      ( equivStrain - oldEquivStrain ) / deltaTime;
 	    
 	    tempRateFactor = computeRateFactor(tempStrainRate, gp, tStep);	  
