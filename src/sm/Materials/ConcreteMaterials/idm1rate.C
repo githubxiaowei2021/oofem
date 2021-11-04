@@ -88,7 +88,7 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     LinearElasticMaterial *lmat = this->giveLinearElasticMaterial();
     FloatArray reducedTotalStrainVector;
     FloatMatrix de;
-    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., tempStrainRate = 0., crackopening = 0., oldcrackopening = 0., crackopeningrate, Le, tempBeta = 0.,tempRateFactor = 1.;
+    double f, equivStrain, oldEquivStrain, tempKappa = 0.0, tempKappaOne = 0.0, tempKappaTwo = 0.0, omega = 0.0, deltaTime = 0., tempStrainRate = 0., tempBeta = 0.,tempRateFactor = 1.;
 
     
     this->initTempStatus(gp);
@@ -147,11 +147,11 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 	    if(tempBeta == 0){
 	      printf("Check beta \n");
 	      //Calculate tempBeta only once 
-	      tempBeta = status->giveStrainRate()/(status->giveTempDamage()*status->giveLe()*
-						   ( equivStrain - oldEquivStrain ) / deltaTime);
+	      tempBeta = status->giveStrainRate()/(status->giveLe()*
+		( equivStrain - oldEquivStrain ) / deltaTime);
 	    }
 	      
-	    tempStrainRate = tempBeta*status->giveTempDamage()*status->giveLe()*
+	    tempStrainRate = tempBeta*status->giveLe()*
 	      ( equivStrain - oldEquivStrain ) / deltaTime;
 	    
 	    tempRateFactor = computeRateFactor(tempStrainRate, gp, tStep);	  
@@ -167,7 +167,6 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 
         omega = computeDamageParameter(tempKappaOne, tempKappaTwo, gp);
 
-
 	if(status->giveTempDamage() >0. && status->giveDamage() == 0.){
 	  //for strengthrate type 2 we need to check that we do not use the pre-damage rate factor
 	  //if damage has already started.
@@ -178,12 +177,10 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 	  this->initDamaged(tempKappaOne, reducedTotalStrainVector, gp);	  
 	  omega = computeDamageParameter(tempKappaOne, tempKappaTwo, gp);
 	  
-	}
-	
+	}	
     }
 
     lmat->giveStiffnessMatrix(de, SecantStiffness, gp, tStep);
-
 
     if ( ( reducedTotalStrainVector.giveSize() > 1 ) || ( reducedTotalStrainVector.at(1) > 0. ) ) {
 
@@ -191,12 +188,6 @@ IDM1Rate::giveRealStressVector(FloatArray &answer, GaussPoint *gp,
     }
 
     answer.beProductOf(de, reducedTotalStrainVector);
-    //auto status = static_cast< IsotropicDamageMaterial1Status * >( this->giveStatus(gp) );
-    Le = status->giveLe();
-    crackopening = Le * status->giveDamage() * equivStrain;
-    oldcrackopening = Le * omega * oldEquivStrain;
-    crackopeningrate = (crackopening-oldcrackopening) / deltaTime;
-
 
     // update gp
     status->letTempReducedStrainBe(reducedTotalStrainVector);
