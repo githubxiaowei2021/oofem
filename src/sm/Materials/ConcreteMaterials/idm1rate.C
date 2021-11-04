@@ -311,8 +311,12 @@ IDM1Rate::computeDamageParameter(double tempKappaOne, double tempKappaTwo, Gauss
                 nite++;
                 help = omega * tempKappaTwo / ef;
                 R = ( 1. - omega ) * tempKappaOne - e0 * exp(-help); //residuum
+		//		printf("R = %e, omega = %e, tempKappaOne = %e, tempKappaTwo = %e\n", R, omega, tempKappaOne, tempKappaTwo);
                 Lhs = tempKappaOne - e0 * exp(-help) * tempKappaTwo / ef; //- dR / (d omega)
                 omega += R / Lhs;
+		if(omega > 1. || omega <0.){
+		  omega = 1;
+		}
                 if ( nite > 40 ) {
                     OOFEM_ERROR("algorithm not converging");
                 }
