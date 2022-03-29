@@ -52,41 +52,178 @@
 
 namespace oofem {
 REGISTER_Material(ConcreteDPM2Rate);
-
-
-ConcreteDPM2RateStatus::ConcreteDPM2RateStatus(GaussPoint *gp) : ConcreteDPM2Status(GaussPoint *gp)
+  
+  //****************************************
+  //Status of ConcreteDPM2Rate
+  //*************************************
+  
+ConcreteDPM2RateStatus::ConcreteDPM2RateStatus(GaussPoint *gp) : ConcreteDPM2Status(gp)
 {
 }
 
 
+void
+ConcreteDPM2RateStatus::initTempStatus()
+{
+    ConcreteDPM2Status::initTempStatus();
+    this->tempReducedStrain = this->reducedStrain;
+    this->tempKappaOne = this->kappaOne;
+    this->tempKappaTwo = this->kappaTwo;
+    this->tempBeta = this->beta;
+    this->tempStrainRate = this->strainRate;
+    this->tempRateFactor = this->rateFactor;
+    this->tempKappaDTension = this->kappaDTension;
+    this->tempKappaDTensionOne = this->kappaDTensionOne;
+    this->tempKappaDTensionTwo = this->kappaDTensionTwo;
+    this->tempDamageTension = this->damageTension;
+}
+
 
 void
-ConcreteDPM2RateStatus::initTempStatus();
+ConcreteDPM2RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
 {
-    StructuralMaterial::initTempStatus();
+    // Call corresponding function of the parent class to print
+    ConcreteDPM2Status::printOutputAt(file, tStep);
+    fprintf(file, "kappaOne %f kappaTwo %f beta %f strainRate %f rateFactor %f\n", this->kappaOne, this->kappaTwo, this->beta, this->strainRate, this->rateFactor);
+}
+
+void
+ConcreteDPM2RateStatus::updateYourself(TimeStep *tStep)
+{
+    ConcreteDPM2Status::updateYourself(tStep);
+    this->tempReducedStrain = this->reducedStrain;
+    this->kappaOne = this->tempKappaOne;
+    this->kappaTwo = this->tempKappaTwo;
+    this->beta = this->tempBeta;
+    this->strainRate = this->tempStrainRate;
+    this->rateFactor = this->tempRateFactor;
+    this->kappaDTension = this->tempKappaDTension;
+    this->kappaDTensionOne = this->tempKappaDTensionOne;
+    this->kappaDTensionTwo = this->tempKappaDTensionTwo;
+    this->damageTension = this->tempDamageTension;
 
 }
 
 
+void
+ConcreteDPM2RateStatus::saveContext(DataStream &stream, ContextMode mode)
+{
+    ConcreteDPM2Status::saveContext(stream, mode);
+
+    contextIOResultType iores;
+
+    if ( ( iores = reducedStrain.storeYourself(stream) ) != CIO_OK ) {
+        THROW_CIOERR(iores);
+    }
+
+    if ( !stream.write(kappaOne) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaTwo) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(beta) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+    
+    if ( !stream.write(strainRate) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(rateFactor) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaDTension) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaDTensionOne) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaDTensionTwo) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(damageTension) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+}
 
 void
-ConcreteDPM2Rate::giveRealStressVector(const FloatArrayF< 6 > &strain,
-                                       const FloatMatrixF< 6, 6 > &D,
-                                       double deltaTime,
-                                       GaussPoint *gp,
-                                       TimeStep *tStep,
-                                       double tempAlpha,
-                                       const FloatArrayF< 6 > &effectiveStress)
-//
-// returns real stress vector in 3d stress space of receiver according to
-// previous level of stress and current
-// strain increment, the only way, how to correctly update gp records
-//
+ConcreteDPM2RateStatus::restoreContext(DataStream &stream, ContextMode mode)
 {
-    auto status = static_cast< ConcreteDPM2Rate * >( this->give(gp) );
-    const auto &strain = status->giveTempReducedStrain();
-    auto principalStrain = StructuralMaterial::computePrincipalValues(from_voigt_strain(strain) );
+    ConcreteDPM2Status::restoreContext(stream, mode);
 
+    contextIOResultType iores;
+
+    if ( ( iores = reducedStrain.restoreYourself(stream) ) != CIO_OK ) {
+        THROW_CIOERR(iores);
+    }
+
+    if ( !stream.read(kappaOne) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(kappaTwo) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(beta) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(strainRate) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(rateFactor) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaDTension) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaDTensionOne) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(kappaDTensionTwo) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(damageTension) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+    
+}
+
+
+  
+  //***************************
+  //ConcreteDPM2Rate Class
+  //***************************
+
+
+
+FloatArrayF< 2 >
+ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
+                            const FloatMatrixF< 6, 6 > &D,
+                            double deltaTime,
+                            GaussPoint *gp,
+                            TimeStep *tStep,
+                            double tempAlpha,
+                            const FloatArrayF< 6 > &effectiveStress) const
+{
+    auto status = static_cast< ConcreteDPM2RateStatus * >( this->giveStatus(gp) );
+
+    //   const auto &strain = status->giveTempReducedStrain();
+    //    auto principalStrain = StructuralMaterial::computePrincipalValues(from_voigt_strain(strain) );
+    
     double tempEquivStrain;
     double deltaPlasticStrainNorm;
     double tempDamageTension = 0.0;
@@ -95,8 +232,8 @@ ConcreteDPM2Rate::giveRealStressVector(const FloatArrayF< 6 > &strain,
     double tempKappaDTensionOne = 0.0, tempKappaDTensionTwo = 0.0;
     double tempKappaOne = 0.0, tempKappaTwo = 0.0;
 
-    double tempstrainRate = 0., tempRateFactor = 1.;
-    double omega = 0.0, deltaTime = 0.;
+    double tempStrainRate = 0., tempRateFactor = 1.;
+    double omega = 0.0;
     double tempBeta = 0.;
 
 
@@ -113,13 +250,14 @@ ConcreteDPM2Rate::giveRealStressVector(const FloatArrayF< 6 > &strain,
     //Evaluate the equivalent strains
     double oldRateStrain = status->giveRateStrain();
 
-    tempstrainRate = ( maxStrain - oldRateStrain ) / deltaTime;
+    tempStrainRate = ( maxStrain - oldRateStrain ) / deltaTime;
     status->letTempRateStrainBe(maxStrain);
-    tempRateFactor = computeRateFactor(strainRate,gp,tStep);
+    tempRateFactor = computeRateFactor(tempStrainRate, gp, tStep);
 
     double minEquivStrain = 0.;
 
     double sig, rho, theta;
+    
     //Calculate coordinates
     computeCoordinates(effectiveStress, sig, rho, theta);
 
@@ -401,144 +539,4 @@ ConcreteDPM2Rate::ConcreteDPM2RateStatus(GaussPoint *g) : ConcreteDPM2Material1S
     tempReducedStrain = reducedStrain;
 }
 
-void
-ConcreteDPM2Rate::initTempStatus()
-{
-    ConcreteDPM2Status::initTempStatus();
-    this->tempReducedStrain = this->reducedStrain;
-    this->tempKappaOne = this->kappaOne;
-    this->tempKappaTwo = this->kappaTwo;
-    this->tempBeta = this->beta;
-    this->tempStrainRate = this->strainRate;
-    this->tempRateFactor = this->rateFactor;
-    this->tempKappaDTension = this->kappaDTension;
-    this->tempKappaDTensionOne = this->kappaDTensionOne;
-    this->tempKappaDTensionTwo = this->kappaDTensionTwo;
-    this->tempDamageTension = this->damageTension;
-
-}
-
-
-void
-ConcreteDPM2RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
-{
-    // Call corresponding function of the parent class to print
-    ConcreteDPM2Status::printOutputAt(file, tStep);
-    fprintf(file, "kappaOne %f kappaTwo %f beta %f strainRate %f rateFactor %f\n", this->kappaOne, this->kappaTwo, this->beta, this->strainRate, this->rateFactor);
-}
-
-void
-ConcreteDPM2RateStatus::updateYourself(TimeStep *tStep)
-{
-    ConcreteDPM2Status::updateYourself(tStep);
-    this->tempReducedStrain = this->reducedStrain;
-    this->kappaOne = this->tempKappaOne;
-    this->kappaTwo = this->tempKappaTwo;
-    this->beta = this->tempBeta;
-    this->strainRate = this->tempStrainRate;
-    this->rateFactor = this->tempRateFactor;
-    this->kappaDTension = this->tempKappaDTension;
-    this->kappaDTensionOne = this->tempKappaDTensionOne;
-    this->kappaDTensionTwo = this->tempKappaDTensionTwo;
-    this->damageTension = this->tempDamageTension;
-
-}
-
-
-void
-ConcreteDPM2RateStatus::saveContext(DataStream &stream, ContextMode mode)
-{
-    ConcreteDPM2Status::saveContext(stream, mode);
-
-    contextIOResultType iores;
-
-    if ( ( iores = reducedStrain.storeYourself(stream) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( !stream.write(kappaOne) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(kappaTwo) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(beta) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-    
-    if ( !stream.write(strainRate) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(rateFactor) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(kappaDTension) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(kappaDTensionOne) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(kappaDTensionTwo) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(damageTension) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-}
-
-void
-ConcreteDPM2RateStatus::restoreContext(DataStream &stream, ContextMode mode)
-{
-    ConcreteDPM2Status::restoreContext(stream, mode);
-
-    contextIOResultType iores;
-
-    if ( ( iores = reducedStrain.restoreYourself(stream) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( !stream.read(kappaOne) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.read(kappaTwo) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.read(beta) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.read(strainRate) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.read(rateFactor) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(kappaDTension) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(kappaDTensionOne) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(kappaDTensionTwo) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(damageTension) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-    
-}
 }// end namespace oofem

@@ -35,6 +35,7 @@
 #ifndef concretedpm2rate_h
 #define concretedpm2rate_h
 
+#include "sm/Materials/ConcreteMaterials/concretedpm2.h"
 #include "sm/Materials/structuralmaterial.h"
 #include "floatarray.h"
 #include "floatmatrix.h"
@@ -54,7 +55,7 @@ namespace oofem {
  * Stores the characteristic length of the element.
  * @author: Xiaowei Liu, Peter Grassl
  */
-class ConcreteDPM2Rate : public ConcreteDPM2Status
+class ConcreteDPM2RateStatus : public ConcreteDPM2Status
 {
 protected:
 
@@ -144,20 +145,13 @@ class ConcreteDPM2Rate : public ConcreteDPM2
 
 public:
     /// Constructor
-    ConcreteDPM2RateStatus(GaussPoint *gp);
-    
+    ConcreteDPM2Rate(int n, Domain *d);
+
 
     const char *giveClassName() const override { return "ConcreteDPM2Rate"; }
 
-    void initTempStatus() override;
-
-    void giveRealStressVector(const FloatArrayF< 6 > &strain,
-                                       const FloatMatrixF< 6, 6 > &D,
-                                       double deltaTime,
-                                       GaussPoint *gp,
-                                       TimeStep *tStep,
-                                       double tempAlpha,
-                                       const FloatArrayF< 6 > &effectiveStress) override;
+    
+    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double timeFactor, GaussPoint *gp, TimeStep *tStep, double alpha, const FloatArrayF< 6 > &effectiveStress) const override;
 
     double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor) const;
 
