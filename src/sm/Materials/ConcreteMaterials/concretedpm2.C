@@ -887,6 +887,7 @@ namespace oofem {
         return stress;
     }
 
+
     FloatArrayF < 2 >
     ConcreteDPM2::computeDamage(const FloatArrayF < 6 > & strain,
                                 const FloatMatrixF < 6, 6 > & D,
@@ -921,6 +922,7 @@ namespace oofem {
         } else {
             rateFactor = status->giveRateFactor();
         }
+
 
         //Compute equivalent strains for  tension and compression
         double tempEquivStrainTension = 0.;

@@ -59,35 +59,21 @@ class ConcreteDPM2RateStatus : public ConcreteDPM2Status
 {
 protected:
 
-    FloatArray reducedStrain;
-    FloatArray tempReducedStrain;
-
-    double kappaOne = 0.;
-    double kappaTwo = 0.;
-    double tempKappaOne = 0.;
-    double tempKappaTwo = 0.;
-
     double beta = 0.;
     double tempBeta = 0.;
 
-    double strainRate = 0.;
-    double tempStrainRate = 0.;
-       
-    double rateFactor = 0.;
-    double tempRateFactor = 0.;
+    double strainRateTension = 0.;
+    double tempStrainRateTension = 0.;
 
-    double DamageTension = 0.0;
-    double tempDamageTension = 0.0;
+    double strainRateCompression = 0.;
+    double tempStrainRateCompression = 0.;    
+    
+    double rateFactorTension = 0.;
+    double tempRateFactorTension = 0.;
 
-    double KappaDTension = 0.0;
-    double tempKappaDTension = 0.0;
-
-    double KappaDTensionOne = 0.0;
-    double tempKappaDTensionOne = 0.0;
-
-    double KappaDTensionTwo = 0.0;
-    double tempKappaDTensionTwo = 0.0;
-
+    double rateFactorCompression = 0.;
+    double tempRateFactorCompression = 0.;
+    
 public:
     /// Constructor
     ConcreteDPM2RateStatus(GaussPoint *g);
@@ -98,40 +84,26 @@ public:
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
 
-    double giveKappaDTensionOne() const { return KappaDTensionOne; }
-    double giveKappaDTensionTwo() const { return KappaDTensionTwo; }
-    double giveKappaOne() const { return kappaOne; }
-    double giveKappaTwo() const { return kappaTwo; }
     double giveBeta() const { return beta;}
-    double giveStrainRate() const {return strainRate;}    
-    double giveRateFactor() const {return rateFactor;}
+    double giveStrainRateTension() const {return strainRateTension;}    
+    double giveRateFactorTension() const {return rateFactorTension;}
+    double giveStrainRateCompression() const {return strainRateCompression;}    
+    double giveRateFactorCompression() const {return rateFactorCompression;}
     
-    double giveTempKappaDTensionOne() const { return tempKappaDTensionOne; }   
-    double giveTempKappaDTensionTwo() const { return tempKappaDTensionTwo; }
-    double giveTempKappaOne() const { return tempKappaOne; }   
-    double giveTempKappaTwo() const { return tempKappaTwo; }
     double giveTempBeta() const { return tempBeta;}
-    double giveTempStrainRate() const { return tempStrainRate;}
-    double giveTempRateFactor() const { return tempRateFactor;}
-    
-    void setTempKappaDTensionOne(double newKappaDTensionOne) { tempKappaDTensionOne = newKappaDTensionOne; }
-    void setTempKappaDTensionTwo(double newKappaDTensionTwo) { tempKappaTwo = newKappaDTensionTwo; }
-    void setTempKappaOne(double newKappaOne) { tempKappaOne = newKappaOne; }
-    void setTempKappaTwo(double newKappaTwo) { tempKappaTwo = newKappaTwo; }
+    double giveTempStrainRateTension() const { return tempStrainRateTension;}
+    double giveTempRateFactorTension() const { return tempRateFactorTension;}
+    double giveTempStrainRateCompression() const { return tempStrainRateCompression;}
+    double giveTempRateFactorCompression() const { return tempRateFactorCompression;}
+
     void setTempBeta(double newBeta) { tempBeta = newBeta; }
-    void setTempStrainRate(double newStrainRate) { tempStrainRate = newStrainRate; }
-    void setTempRateFactor(double newRateFactor) { tempRateFactor = newRateFactor; }
+    void setTempStrainRateTension(double newStrainRate) { tempStrainRateTension = newStrainRate; }
+    void setTempRateFactorTension(double newRateFactor) { tempRateFactorTension = newRateFactor; }
+    void setTempStrainRateCompression(double newStrainRate) { tempStrainRateCompression = newStrainRate; }
+    void setTempRateFactorCompression(double newRateFactor) { tempRateFactorCompression = newRateFactor; }
 
     const char *giveClassName() const override { return "ConcreteDPM2RateStatus"; }
 
-    /**
-     * Get the reduced strain vector from the material status.
-     * @return Strain vector.
-     */
-    const FloatArray &giveReducedStrain() const { return reducedStrain; }
-
-    void letTempReducedStrainBe(const FloatArray &v)
-    { tempReducedStrain = v; }
 };
 
 
@@ -147,22 +119,25 @@ public:
     /// Constructor
     ConcreteDPM2Rate(int n, Domain *d);
 
+    void initializeFrom(InputRecord &ir) override;
 
     const char *giveClassName() const override { return "ConcreteDPM2Rate"; }
 
     
     FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double timeFactor, GaussPoint *gp, TimeStep *tStep, double alpha, const FloatArrayF< 6 > &effectiveStress) const override;
 
-    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor) const;
+    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld) const;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
     
-    double computeRateFactor(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
+    double computeRateFactorTension(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
 
+    double computeRateFactorCompression(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
+
+    /// Compute damage parameter in compression.
+    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld) const;
 
     MaterialStatus *CreateStatus(GaussPoint *gp) const override;
-    MaterialStatus *giveStatus(GaussPoint *gp) const override;
-
 
 protected:
 };
