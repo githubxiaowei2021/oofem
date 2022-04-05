@@ -59,6 +59,7 @@
 #define _IFT_ConcreteDPM2_dhard "dhard"
 #define _IFT_ConcreteDPM2_dilation "dilation"
 #define _IFT_ConcreteDPM2_asoft "asoft"
+#define _IFT_ConcreteDPM2_bsoft "bsoft"
 #define _IFT_ConcreteDPM2_hp "hp"
 #define _IFT_ConcreteDPM2_yieldtol "yieldtol"
 #define _IFT_ConcreteDPM2_newtoniter "newtoniter"
@@ -98,17 +99,6 @@ public:
         ConcreteDPM2_VertexTensionDamage
     };
 
-    enum ConcreteDPM2_ReturnType {
-        RT_Regular,
-        RT_Tension,
-        RT_Compression,
-        RT_Auxiliary
-    };
-
-    enum ConcreteDPM2_ReturnResult {
-        RR_NotConverged,
-        RR_Converged
-    };
 
 
 protected:
@@ -186,12 +176,6 @@ protected:
     int state_flag = ConcreteDPM2Status::ConcreteDPM2_Elastic;
     int temp_state_flag = ConcreteDPM2Status::ConcreteDPM2_Elastic;
 
-    int returnType = ConcreteDPM2Status::RT_Regular;
-    int tempReturnType = ConcreteDPM2Status::RT_Regular;
-
-    int returnResult = ConcreteDPM2Status::RR_NotConverged;
-    int tempReturnResult = ConcreteDPM2Status::RR_NotConverged;
-
 
 #ifdef keep_track_of_dissipated_energy
     /// Density of total work done by stresses on strain increments.
@@ -250,8 +234,8 @@ public:
     double giveDeviatoricPlasticStrainNorm() const
     {
         auto dev = StructuralMaterial::computeDeviator(plasticStrain);
-        return sqrt( .5 * ( 2. * dev [ 0 ] * dev [ 0 ] + 2. * dev [ 1 ] * dev [ 1 ] + 2. * dev [ 2 ] * dev [ 2 ] +
-                            dev [ 3 ] * dev [ 3 ] + dev [ 4 ] * dev [ 4 ] + dev [ 5 ] * dev [ 5 ] ) );
+        return sqrt(.5 * ( 2. * dev [ 0 ] * dev [ 0 ] + 2. * dev [ 1 ] * dev [ 1 ] + 2. * dev [ 2 ] * dev [ 2 ] +
+                           dev [ 3 ] * dev [ 3 ] + dev [ 4 ] * dev [ 4 ] + dev [ 5 ] * dev [ 5 ] ) );
     }
 
     /**
@@ -471,9 +455,6 @@ public:
     int giveTempStateFlag() const
     { return temp_state_flag; }
 
-    int giveTempReturnType() const { return tempReturnType; }
-    int giveTempReturnResult() const { return tempReturnResult; }
-
     // letTemp...be :
     // Functions used by the material to assign a new value to a temp variable.
     /**
@@ -603,10 +584,6 @@ public:
     void letTempStateFlagBe(const int v)
     { temp_state_flag = v; }
 
-    void letTempReturnTypeBe(const int type) { tempReturnType = type; }
-
-    void letTempReturnResultBe(const int result) { tempReturnResult = result; }
-
     void letKappaPPeakBe(double kappa)
     { kappaPPeak = kappa; }
 #ifdef keep_track_of_dissipated_energy
@@ -652,6 +629,21 @@ class ConcreteDPM2 : public StructuralMaterial
 {
 public:
 
+    enum ConcreteDPM2_ReturnResult {
+        RR_Unknown,
+        RR_NotConverged,
+        RR_Converged
+    };
+
+    enum ConcreteDPM2_ReturnType {
+        RT_Unknown,
+        RT_Regular,
+        RT_Tension,
+        RT_Compression,
+        RT_Auxiliary
+    };
+
+
 protected:
     /// Parameters of the yield surface of the plasticity model. fc is the uniaxial compressive strength, ft the uniaxial tensile strength and ecc controls the out of roundness of the deviatoric section.
     double fc = 0., ft = 0., ecc = 0.;
@@ -677,6 +669,9 @@ protected:
 
     /// Parameter of the ductilityMeasure of the damage model.
     double ASoft = 0.;
+
+    /// Parameter of the ductilityMeasure of the damage model.
+    double BSoft = 0.;
 
     /// Parameter of the hardening law of the plasticity model.
     double yieldHardPrimePeak = 0.;
@@ -782,6 +777,7 @@ public:
      * @param gp Gauss point
      */
     void checkForVertexCase(double &answer,
+                            ConcreteDPM2_ReturnType &returnType,
                             double sig,
                             double tempKappa,
                             GaussPoint *gp) const;
@@ -794,6 +790,8 @@ public:
      * @param theta Load angle of trial stress (remains constant throughout return).
      */
     double performRegularReturn(FloatArrayF< 6 > &stress,
+                                ConcreteDPM2_ReturnResult &returnResult,
+                                ConcreteDPM2_ReturnType &returnType,
                                 double kappaP,
                                 GaussPoint *gp,
                                 double theta) const;
@@ -823,6 +821,8 @@ public:
      * @returns updated temporary cummulative plastic strain
      */
     double performVertexReturn(FloatArrayF< 6 > &stress,
+                               ConcreteDPM2_ReturnResult &returnResult,
+                               ConcreteDPM2_ReturnType &returnType,
                                double apexStress,
                                double tempKappaP,
                                GaussPoint *gp) const;
@@ -1051,7 +1051,7 @@ public:
                             double sig) const;
 
     /// Compute damage parameters
-    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double timeFactor, GaussPoint *gp, TimeStep *tStep, double alpha, const FloatArrayF< 6 > &effectiveStress) const;
+    virtual FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double timeFactor, GaussPoint *gp, TimeStep *tStep, double alpha, const FloatArrayF< 6 > &effectiveStress) const;
 
 
     /// Check for un- and reloading in the damage part
@@ -1064,10 +1064,10 @@ public:
     double computeAlpha(FloatArrayF< 6 > &effectiveStressTension, FloatArrayF< 6 > &effectiveStressCompression, const FloatArrayF< 6 > &effectiveStress) const;
 
     /// Compute damage parameter in tension.
-    virtual double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor) const;
+    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor) const;
 
     /// Compute damage parameter in compression.
-    virtual double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor) const;
+    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor) const;
 
     /// Compute equivalent strain value for tension.
     double computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const;
@@ -1126,6 +1126,7 @@ public:
 
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
+
 
 protected:
     MaterialStatus *CreateStatus(GaussPoint *gp) const override;

@@ -93,9 +93,6 @@ ConcreteDPM2Status::initTempStatus()
     tempRateFactor = rateFactor;
     tempRateStrain = rateStrain;
 
-    tempReturnType = returnType;
-    tempReturnResult = returnResult;
-
 #ifdef keep_track_of_dissipated_energy
     tempStressWork = stressWork;
     tempDissWork = dissWork;
@@ -142,10 +139,6 @@ ConcreteDPM2Status::updateYourself(TimeStep *tStep)
     rateFactor = tempRateFactor;
 
     rateStrain = tempRateStrain;
-
-    returnType = tempReturnType;
-
-    returnResult = tempReturnResult;
 
 #ifdef keep_track_of_dissipated_energy
     stressWork = tempStressWork;
@@ -219,6 +212,8 @@ ConcreteDPM2Status::printOutputAt(FILE *file, TimeStep *tStep) const
     fprintf(file, " damageCompression %.10e,", damageCompression);
 
     fprintf(file, " alpha %.10e,", this->alpha);
+
+    fprintf(file, " rateFactor %.10e,", this->rateFactor);
 
 #ifdef keep_track_of_dissipated_energy
     fprintf(file, " dissW %g, freeE %g, stressW %g ", this->dissWork, ( this->stressWork ) - ( this->dissWork ), this->stressWork);
@@ -316,13 +311,6 @@ ConcreteDPM2Status::saveContext(DataStream &stream, ContextMode mode)
         THROW_CIOERR(CIO_IOERR);
     }
 
-    if ( !stream.write(returnType) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.write(returnResult) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
 
 #ifdef keep_track_of_dissipated_energy
     if ( !stream.write(stressWork) ) {
@@ -421,14 +409,6 @@ ConcreteDPM2Status::restoreContext(DataStream &stream, ContextMode mode)
     }
 
     if ( !stream.read(state_flag) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.read(returnType) ) {
-        THROW_CIOERR(CIO_IOERR);
-    }
-
-    if ( !stream.read(returnResult) ) {
         THROW_CIOERR(CIO_IOERR);
     }
 
@@ -580,8 +560,11 @@ ConcreteDPM2::initializeFrom(InputRecord &ir)
     this->efCompression = 100.e-6;
     IR_GIVE_OPTIONAL_FIELD(ir, this->efCompression, _IFT_ConcreteDPM2_efc);
 
-    this->ASoft = 15;
+    this->ASoft = 15.;
     IR_GIVE_OPTIONAL_FIELD(ir, this->ASoft, _IFT_ConcreteDPM2_asoft);
+
+    this->BSoft = 1.;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->BSoft, _IFT_ConcreteDPM2_bsoft);
 
     this->helem = 0.;
     IR_GIVE_OPTIONAL_FIELD(ir, this->helem, _IFT_ConcreteDPM2_helem);
@@ -923,11 +906,11 @@ ConcreteDPM2::computeDamage(const FloatArrayF< 6 > &strain,
     int unAndReloadingFlag = checkForUnAndReloading(tempEquivStrain, minEquivStrain, D, gp);
 
     double rateFactor;
-    // if ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) {
+    if ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) {
         rateFactor = computeRateFactor(tempAlpha, deltaTime, gp, tStep);
-	// } else {
-	// rateFactor = status->giveRateFactor();
-	// }
+    } else {
+        rateFactor = status->giveRateFactor();
+    }
 
 
     //Compute equivalent strains for  tension and compression
@@ -943,19 +926,19 @@ ConcreteDPM2::computeDamage(const FloatArrayF< 6 > &strain,
     }
 
 
-    //// If damage threshold is exceeded determine the rate factor from the previous step
-    // if ( ( tempEquivStrainTension > e0 || tempEquivStrainCompression > e0 ) &&
-    //      ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) && !tStep->isTheFirstStep() ) {
-    //     //Rate factor from last step
-    //     rateFactor = status->giveRateFactor();
+    //If damage threshold is exceeded determine the rate factor from the previous step
+    if ( ( tempEquivStrainTension > e0 || tempEquivStrainCompression > e0 ) &&
+         ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) && !tStep->isTheFirstStep() ) {
+        //Rate factor from last step
+        rateFactor = status->giveRateFactor();
 
-    //     tempEquivStrainTension = status->giveEquivStrainTension() + ( tempEquivStrain - status->giveEquivStrain() ) / rateFactor;
-    //     if ( unAndReloadingFlag == 0 ) { //Standard way
-    //         tempEquivStrainCompression = status->giveEquivStrainCompression() + ( tempAlpha * ( tempEquivStrain - status->giveEquivStrain() ) ) / rateFactor;
-    //     } else {
-    //         tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * ( minEquivStrain - status->giveEquivStrain() ) / rateFactor + ( tempAlpha * ( tempEquivStrain - minEquivStrain ) ) / rateFactor;
-    //     }
-    // }
+        tempEquivStrainTension = status->giveEquivStrainTension() + ( tempEquivStrain - status->giveEquivStrain() ) / rateFactor;
+        if ( unAndReloadingFlag == 0 ) { //Standard way
+            tempEquivStrainCompression = status->giveEquivStrainCompression() + ( tempAlpha * ( tempEquivStrain - status->giveEquivStrain() ) ) / rateFactor;
+        } else {
+            tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * ( minEquivStrain - status->giveEquivStrain() ) / rateFactor + ( tempAlpha * ( tempEquivStrain - minEquivStrain ) ) / rateFactor;
+        }
+    }
 
     status->letTempRateFactorBe(rateFactor);
 
@@ -1142,7 +1125,8 @@ ConcreteDPM2::computeRateFactor(double alpha,
     const auto &strain = status->giveTempReducedStrain();
 
     //Determine the principal values of the strain
-    auto principalStrain = StructuralMaterial::computePrincipalValues(from_voigt_strain(strain) );   ///@todo CHECK
+
+    auto principalStrain = StructuralMaterial::computePrincipalValues(from_voigt_strain(strain) );     ///@todo CHECK
 
     //Determine max and min value;
     double maxStrain = -1.e20, minStrain = 1.e20;
@@ -1210,6 +1194,7 @@ ConcreteDPM2::computeRateFactor(double alpha,
     }
 
     double rateFactor = ( 1. - alpha ) * rateFactorTension + alpha * rateFactorCompression;
+
 
     return rateFactor;
 }
@@ -1497,7 +1482,7 @@ ConcreteDPM2::computeDuctilityMeasureDamage(GaussPoint *gp, const double sig, co
         Rs = 0;
     }
 
-    return 1. + ( ASoft - 1. ) * Rs; // ductilityMeasure
+    return 1. + ( this->ASoft - 1. ) * pow(Rs, this->BSoft); // ductilityMeasure
 }
 
 
@@ -1505,6 +1490,9 @@ FloatArrayF< 6 >
 ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain) const
 {
     auto status = static_cast< ConcreteDPM2Status * >( this->giveStatus(gp) );
+
+    ConcreteDPM2_ReturnResult returnResult = RR_Unknown;
+    ConcreteDPM2_ReturnType returnType = RT_Unknown;
 
     //get plastic strain and kappa
     auto tempPlasticStrain = status->givePlasticStrain();
@@ -1529,8 +1517,8 @@ ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 >
     FloatArrayF< 6 >effectiveStress;
 
     //To get into the loop
-    status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
-    while ( status->giveTempReturnResult() == ConcreteDPM2Status::RR_NotConverged || subIncrementFlag == 1 ) {
+    returnResult = RR_NotConverged;
+    while ( returnResult == RR_NotConverged || subIncrementFlag == 1 ) {
         auto elasticStrain = tempStrain - tempPlasticStrain;
 
         effectiveStress = dot(D, elasticStrain);
@@ -1542,24 +1530,29 @@ ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 >
         apexStress = 0.;
 
         if ( yieldValue > 0. ) {
-            checkForVertexCase(apexStress, sig, tempKappaP, gp);
-            if ( status->giveTempReturnType() == ConcreteDPM2Status::RT_Tension || status->giveTempReturnType() == ConcreteDPM2Status::RT_Compression ) {
-                tempKappaP = performVertexReturn(effectiveStress, apexStress, tempKappaP, gp);
+            checkForVertexCase(apexStress, returnType, sig, tempKappaP, gp);
+            if ( returnType == RT_Tension || returnType == RT_Compression ) {
+                tempKappaP = performVertexReturn(effectiveStress, returnResult, returnType, apexStress, tempKappaP, gp);
                 status->letTempKappaPBe(tempKappaP);
+                if ( returnType == RT_Tension ) {
+                    status->letTempStateFlagBe(ConcreteDPM2Status::ConcreteDPM2_VertexTension);
+                } else if ( returnType == RT_Compression ) {
+                    status->letTempStateFlagBe(ConcreteDPM2Status::ConcreteDPM2_VertexCompression);
+                }
             }
-            if ( status->giveTempReturnType() == ConcreteDPM2Status::RT_Regular ) {
-                tempKappaP = performRegularReturn(effectiveStress, tempKappaP, gp, theta);
+            if ( returnType == RT_Regular ) {
+                tempKappaP = performRegularReturn(effectiveStress, returnResult, returnType, tempKappaP, gp, theta);
                 status->letTempKappaPBe(tempKappaP);
             }
         } else {
-            status->letTempReturnResultBe(ConcreteDPM2Status::RR_Converged);
+            returnResult = RR_Converged;
             tempPlasticStrain = status->givePlasticStrain();
             status->letTempPlasticStrainBe(tempPlasticStrain);
             status->letTempKappaPBe(tempKappaP);
             break;
         }
 
-        if ( status->giveTempReturnResult() == ConcreteDPM2Status::RR_NotConverged ) {
+        if ( returnResult == RR_NotConverged ) {
             subincrementcounter++;
             if ( subincrementcounter > 10 ) {
                 OOFEM_LOG_INFO("Unstable element %d \n", gp->giveElement()->giveGlobalNumber() );
@@ -1576,7 +1569,7 @@ ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 >
                 yieldValue = computeYieldValue(sig, rho, theta, tempKappaP);
                 OOFEM_LOG_INFO("OLD Sig %g rho %g theta %g  \n", sig1, rho1, theta1);
                 OOFEM_LOG_INFO("NEW Sig %g rho %g theta %g  \n", sig, rho, theta);
-                if ( status->giveTempReturnType() == ConcreteDPM2Status::RT_Tension || status->giveTempReturnType() == ConcreteDPM2Status::RT_Compression ) {
+                if ( returnType == RT_Tension || returnType == RT_Compression ) {
                     OOFEM_LOG_INFO("Vertex case apexstress %g\n", apexStress);
                 } else {
                     OOFEM_LOG_INFO("Regular case %g \n", 15.18);
@@ -1591,12 +1584,12 @@ ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 >
             subIncrementFlag = 1;
             deltaStrain *= 0.5;
             tempStrain = convergedStrain + deltaStrain;
-        } else if ( status->giveTempReturnResult() == ConcreteDPM2Status::RR_Converged && subIncrementFlag == 0 ) {
+        } else if ( returnResult == RR_Converged && subIncrementFlag == 0 ) {
             auto C = inv(D); // compliance
             elasticStrain = dot(C, effectiveStress);
             tempPlasticStrain = strain - elasticStrain;
             status->letTempPlasticStrainBe(tempPlasticStrain);
-        } else if ( status->giveTempReturnResult() == ConcreteDPM2Status::RR_Converged && subIncrementFlag == 1 ) {
+        } else if ( returnResult == RR_Converged && subIncrementFlag == 1 ) {
             subincrementcounter = 0;
             auto C = inv(D); // compliance
             elasticStrain = dot(C, effectiveStress);
@@ -1604,7 +1597,7 @@ ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 >
             status->letTempPlasticStrainBe(tempPlasticStrain);
 
             subIncrementFlag = 0;
-            status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
+            returnResult = RR_NotConverged;
             convergedStrain = tempStrain;
             deltaStrain = strain - convergedStrain;
             tempStrain = strain;
@@ -1616,6 +1609,7 @@ ConcreteDPM2::performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 >
 
 void
 ConcreteDPM2::checkForVertexCase(double &answer,
+                                 ConcreteDPM2_ReturnType &returnType,
                                  double sig,
                                  double tempKappa,
                                  GaussPoint *gp) const
@@ -1624,17 +1618,19 @@ ConcreteDPM2::checkForVertexCase(double &answer,
 
     answer = 0.;
     if ( sig > 0. ) {
-        status->letTempReturnTypeBe(ConcreteDPM2Status::RT_Tension);
+        returnType = RT_Tension;
     } else if ( sig < 0. &&  tempKappa < 1. ) {
-        status->letTempReturnTypeBe(ConcreteDPM2Status::RT_Compression);
+        returnType = RT_Compression;
     } else {
-        status->letTempReturnTypeBe(ConcreteDPM2Status::RT_Regular);
+        returnType = RT_Regular;
     }
 }
 
 
 double
 ConcreteDPM2::performVertexReturn(FloatArrayF< 6 > &effectiveStress,
+                                  ConcreteDPM2_ReturnResult &returnResult,
+                                  ConcreteDPM2_ReturnType &returnType,
                                   double apexStress, double tempKappaP,
                                   GaussPoint *gp) const
 {
@@ -1660,8 +1656,8 @@ ConcreteDPM2::performVertexReturn(FloatArrayF< 6 > &effectiveStress,
     double yieldValueMid = computeYieldValue(sig2, 0., 0., tempKappaP);
 
     if ( yieldValue * yieldValueMid >= 0. ) {
-        status->letTempReturnTypeBe(ConcreteDPM2Status::RT_Regular);
-        status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
+        returnType = RT_Regular;
+        returnResult = RR_NotConverged;
         return kappaInitial;
     }
 
@@ -1695,8 +1691,8 @@ ConcreteDPM2::performVertexReturn(FloatArrayF< 6 > &effectiveStress,
 
             double ratioTrial = rhoTrial / ( sigTrial - sigAnswer );
 
-            if ( ( ( ( ratioPotential >= ratioTrial ) && status->giveTempReturnType() == ConcreteDPM2Status::RT_Tension ) ) ||
-                 ( ( ratioPotential <= ratioTrial ) && status->giveTempReturnType() == ConcreteDPM2Status::RT_Compression ) ) {
+            if ( ( ( ( ratioPotential >= ratioTrial ) && returnType == RT_Tension ) ) ||
+                 ( ( ratioPotential <= ratioTrial ) && returnType == RT_Compression ) ) {
                 for ( int i = 0; i < 3; i++ ) {
                     effectiveStress.at(i + 1) = sigAnswer;
                 }
@@ -1704,11 +1700,11 @@ ConcreteDPM2::performVertexReturn(FloatArrayF< 6 > &effectiveStress,
                 for ( int i = 3; i < 6; i++ ) {
                     effectiveStress.at(i + 1) = 0.;
                 }
-                status->letTempReturnResultBe(ConcreteDPM2Status::RR_Converged);
+                returnResult = RR_Converged;
                 return tempKappaP;
             } else {
-                status->letTempReturnTypeBe(ConcreteDPM2Status::RT_Regular);
-                status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
+                returnType = RT_Regular;
+                returnResult = RR_NotConverged;
                 return kappaInitial;
             }
         }
@@ -1721,7 +1717,7 @@ ConcreteDPM2::performVertexReturn(FloatArrayF< 6 > &effectiveStress,
     for ( int i = 3; i < 6; i++ ) {
         effectiveStress.at(i + 1) = 0.;
     }
-    status->letTempReturnResultBe(ConcreteDPM2Status::RR_Converged);
+    returnResult = RR_Converged;
 
     OOFEM_WARNING("Perform vertex return not converged!\n");
 
@@ -1802,6 +1798,8 @@ ConcreteDPM2::computeRatioPotential(double sig,
 
 double
 ConcreteDPM2::performRegularReturn(FloatArrayF< 6 > &effectiveStress,
+                                   ConcreteDPM2_ReturnResult &returnResult,
+                                   ConcreteDPM2_ReturnType &returnType,
                                    double kappaP,
                                    GaussPoint *gp,
                                    double theta) const
@@ -1849,7 +1847,7 @@ ConcreteDPM2::performRegularReturn(FloatArrayF< 6 > &effectiveStress,
     while ( normOfResiduals > yieldTol   ) {
         iterationCount++;
         if ( iterationCount == newtonIter ) {
-            status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
+            returnResult = RR_NotConverged;
 
             return kappaP;
         }
@@ -1862,7 +1860,7 @@ ConcreteDPM2::performRegularReturn(FloatArrayF< 6 > &effectiveStress,
         normOfResiduals = norm(residualsNorm);
 
         if ( std::isnan(normOfResiduals) ) {
-            status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
+            returnResult = RR_NotConverged;
             return kappaP;
         }
 
@@ -1874,7 +1872,7 @@ ConcreteDPM2::performRegularReturn(FloatArrayF< 6 > &effectiveStress,
                 auto deltaIncrement = solve( jacobian, FloatArrayF< 4 >(residuals) );
                 unknowns -= deltaIncrement;
             } catch ( ... ) {
-                status->letTempReturnResultBe(ConcreteDPM2Status::RR_NotConverged);
+                returnResult = RR_NotConverged;
                 return kappaP;
             }
 
@@ -1910,7 +1908,7 @@ ConcreteDPM2::performRegularReturn(FloatArrayF< 6 > &effectiveStress,
     stressPrincipal [ 1 ] = sig + sqrt(2. / 3.) * rho * cos(theta - 2. * M_PI / 3.);
     stressPrincipal [ 2 ] = sig + sqrt(2. / 3.) * rho * cos(theta + 2. * M_PI / 3.);
     effectiveStress = transformStressVectorTo(stressPrincipalDir, stressPrincipal, 1);
-    status->letTempReturnResultBe(ConcreteDPM2Status::RR_Converged);
+    returnResult = RR_Converged;
 
     //Store deltaLambda in status
     status->letDeltaLambdaBe(deltaLambda);
@@ -2684,15 +2682,16 @@ ConcreteDPM2::give3dMaterialStiffnessMatrix(MatResponseMode mode,
     auto status = static_cast< ConcreteDPM2Status * >( giveStatus(gp) );
     if ( mode == SecantStiffness ) {
         return this->compute3dSecantStiffness(gp, tStep);
-    } else if ( mode == TangentStiffness ) {
-        const int stateFlag = status->giveTempStateFlag();
-        const int returnType = status->giveTempReturnType();
-        if ( ( stateFlag == ConcreteDPM2Status::ConcreteDPM2_PlasticDamage || stateFlag == ConcreteDPM2Status::ConcreteDPM2_Plastic ) && returnType == ConcreteDPM2Status::RT_Regular ) {
-            return this->compute3dTangentStiffness(gp, tStep);
-        } else {
-            return this->compute3dSecantStiffness(gp, tStep);
-        }
     }
+    //Todo: Tangent stiffness implementation needs to be improved.
+    // else if ( mode == TangentStiffness ) {
+    //     const int stateFlag = status->giveTempStateFlag();
+    //     if ( stateFlag == ConcreteDPM2Status::ConcreteDPM2_PlasticDamage || stateFlag == ConcreteDPM2Status::ConcreteDPM2_Plastic ) {
+    //         return this->compute3dTangentStiffness(gp, tStep);
+    //     } else {
+    //         return this->compute3dSecantStiffness(gp, tStep);
+    //     }
+    // }
     //Elastic case
     return this->linearElasticMaterial.give3dMaterialStiffnessMatrix(mode, gp, tStep);
 }
@@ -2789,7 +2788,13 @@ ConcreteDPM2::assignStateFlag(GaussPoint *gp) const
     if ( tempKappaP > kappaP ) {
         if ( tempDamageTension > damageTension ||  tempDamageTension == 1. ||
              tempDamageCompression > damageCompression || tempDamageCompression == 1. ) {
-            status->letTempStateFlagBe(ConcreteDPM2Status::ConcreteDPM2_PlasticDamage);
+            if ( status->giveTempStateFlag() == ConcreteDPM2Status::ConcreteDPM2_VertexTension ) {
+                status->letTempStateFlagBe(ConcreteDPM2Status::ConcreteDPM2_VertexTensionDamage);
+            } else if ( status->giveTempStateFlag() == ConcreteDPM2Status::ConcreteDPM2_VertexTension ) {
+                status->letTempStateFlagBe(ConcreteDPM2Status::ConcreteDPM2_VertexCompressionDamage);
+            } else {
+                status->letTempStateFlagBe(ConcreteDPM2Status::ConcreteDPM2_PlasticDamage);
+            }
         } else {
             status->letTempStateFlagBe(ConcreteDPM2Status::ConcreteDPM2_Plastic);
         }
