@@ -45,7 +45,7 @@
 #include "gausspoint.h"
 #include "mathfem.h"
 
-#define _IFT_ConcreteDPM2Rate_Name "idm1rate"
+#define _IFT_ConcreteDPM2Rate_Name "con2dpmrate"
 #define _IFT_ConcreteDPM2Rate_strengthratetype "sratetype"
 
 
