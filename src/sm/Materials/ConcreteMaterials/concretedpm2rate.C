@@ -180,8 +180,44 @@ ConcreteDPM2Rate::initializeFrom(InputRecord &ir)
 {
     // call the corresponding service for the linear elastic material
     ConcreteDPM2::initializeFrom(ir);
-    //linearElasticMaterial.initializeFrom(ir);
-    //IR_GIVE_FIELD(ir, this->fc, _IFT_ConcreteDPM2Rate_fc);
+
+
+
+    //atOne = 1.e-6
+    //atTwo = 10
+    //atThree = 0.018
+    //atFour = 0.0062
+    //atFive = 0.333
+    
+    this->atOne = 1.e-6;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->atOne, _IFT_ConcreteDPM2Rate_atOne);
+    this->atTwo = 10;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->atTwo, _IFT_ConcreteDPM2Rate_atTwo);
+    this->atThree = 0.018;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->atThree, _IFT_ConcreteDPM2Rate_atThree);
+    this->atFour = 0.0062;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->atFour, _IFT_ConcreteDPM2Rate_atFour);
+    this->atFive = 0.333;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->atFive, _IFT_ConcreteDPM2Rate_atFive);
+
+
+  //acOne = 30.e-6
+    //acTwo = 30
+    //acThree = 0.014
+    //acFour = 0.012
+    //acFive = 0.333
+  
+    this->acOne = 30.e-6;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->acOne, _IFT_ConcreteDPM2Rate_acOne);
+    this->acTwo = 30;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->acTwo, _IFT_ConcreteDPM2Rate_acTwo);
+    this->acThree = 0.014;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->acThree, _IFT_ConcreteDPM2Rate_acThree);
+    this->acFour = 0.012;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->acFour, _IFT_ConcreteDPM2Rate_acFour);
+    this->acFive = 0.333;
+    IR_GIVE_OPTIONAL_FIELD(ir, this->acFive, _IFT_ConcreteDPM2Rate_acFive);
+    
 }
 
   
@@ -255,7 +291,6 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
     double tempStrainRateTension = 0.,tempRateFactorTension=1., tempBeta = 0.;
     if(status->giveTempDamageTension() == 0){
       //Damage is zero
-      //tempStrainRateTension = ( maxStrain - oldRateStrain ) / deltaTime;
       tempStrainRateTension = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
       tempRateFactorTension = computeRateFactorTension(tempStrainRateTension,gp, tStep);
     }
@@ -265,16 +300,22 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
       if(tempBeta == 0){
 	//Calculate tempBeta only once 
 	tempBeta = status->giveStrainRateTension()/(status->giveLe()*
-	                                                        //( maxStrain - oldRateStrain ) / deltaTime);
-        ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime);
+						    ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime);
       }
       
       tempStrainRateTension = tempBeta*status->giveLe()*
-          //( maxStrain - oldRateStrain ) / deltaTime;
-                                         ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
+	( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
       
       tempRateFactorTension = computeRateFactorTension(tempStrainRateTension, gp, tStep);	  
     }
+
+    status->setTempStrainRateTension(tempStrainRateTension);
+    status->setTempRateFactorTension(tempRateFactorTension);
+    status->setTempBeta(tempBeta);
+    status->setTempStrainRateCompression(tempStrainRateCompression);
+    status->setTempRateFactorCompression(tempRateFactorCompression);
+
+
    
     //Compute equivalent strains for  tension and compression
     double tempEquivStrainTension = 0.;
@@ -506,21 +547,24 @@ ConcreteDPM2Rate::computeRateFactorTension(double strainRate,
 					   GaussPoint *gp,
 					   TimeStep *tStep) const
 {
-   // if ( this->strengthRateType == 0 ) {
-    //    return 1;
-    //}
 
     //Tension
     //For tension according to Model Code 2010
     double rateFactorTension = 1.;
     double strainRateRatioTension = strainRate / 1.e-6;
 
-    if ( strainRate < 1.e-6 ) {
+    //atOne = 1.e-6
+    //atTwo = 10
+    //atThree = 0.018
+    //atFour = 0.0062
+    //atFive = 0.333
+    
+    if ( strainRate < this->atOne ) {
       rateFactorTension = 1.;
-    } else if ( 1.e-6 < strainRate && strainRate < 10 ) {
-      rateFactorTension = pow(strainRateRatioTension, 0.018);
+    } else if ( this->atOne < strainRate && strainRate < this->atTwo ) {
+      rateFactorTension = pow(strainRateRatioTension, this->atThree);
     } else {
-      rateFactorTension =  0.0062 * pow(strainRateRatioTension, 1. / 3.);
+      rateFactorTension =  this->atFour * pow(strainRateRatioTension, this->atFive);
     }
     
     return rateFactorTension;
@@ -532,10 +576,13 @@ ConcreteDPM2Rate::computeRateFactorCompression(double strainRate,
 					   GaussPoint *gp,
 					   TimeStep *tStep) const
 {
-    //if ( this->strengthRateType == 0 ) {
-      //  return 1;
-   // }
 
+    //acOne = 30.e-6
+    //acTwo = 30
+    //acThree = 0.014
+    //acFour = 0.012
+    //acFive = 0.333
+  
     //For compression according to Model Code 2010
     double rateFactorCompression = 1.;
     double strainRateRatioCompression = strainRate / 30.e-6 ;
