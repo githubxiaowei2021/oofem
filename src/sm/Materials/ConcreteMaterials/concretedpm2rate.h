@@ -46,7 +46,18 @@
 #include "mathfem.h"
 
 #define _IFT_ConcreteDPM2Rate_Name "con2dpmrate"
-#define _IFT_ConcreteDPM2Rate_strengthratetype "sratetype"
+
+#define _IFT_ConcreteDPM2Rate_atOne "atone"
+#define _IFT_ConcreteDPM2Rate_atTwo "attwo"
+#define _IFT_ConcreteDPM2Rate_atThree "atthree"
+#define _IFT_ConcreteDPM2Rate_atFour "atfour"
+#define _IFT_ConcreteDPM2Rate_atFive "atfive"
+
+#define _IFT_ConcreteDPM2Rate_acOne "acone"
+#define _IFT_ConcreteDPM2Rate_acTwo "actwo"
+#define _IFT_ConcreteDPM2Rate_acThree "acthree"
+#define _IFT_ConcreteDPM2Rate_acFour "acfour"
+#define _IFT_ConcreteDPM2Rate_acFive "acfive"
 
 
 namespace oofem {
@@ -114,7 +125,19 @@ public:
  */
 class ConcreteDPM2Rate : public ConcreteDPM2
 {
-
+ protected:
+  double atOne;
+  double atTwo;
+  double atThree;
+  double atFour;
+  double atFive;
+  
+  double acOne;
+  double acTwo;
+  double acThree;
+  double acFour;
+  double acFive;	  
+  
 public:
     /// Constructor
     ConcreteDPM2Rate(int n, Domain *d);
