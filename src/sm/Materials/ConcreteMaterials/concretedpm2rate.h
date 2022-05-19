@@ -149,7 +149,7 @@ public:
     
     FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double timeFactor, GaussPoint *gp, TimeStep *tStep, double alpha, const FloatArrayF< 6 > &effectiveStress) const override;
 
-    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld) const;
+    double computeDamageParamTension(double equivStrain, double KappaDTensionOne, double KappaDTensionTwo, double le, double omegaOld) const;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
     
