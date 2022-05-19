@@ -80,7 +80,7 @@ ConcreteDPM2RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
 {
     // Call corresponding function of the parent class to print
     ConcreteDPM2Status::printOutputAt(file, tStep);
-    fprintf(file, "beta %f strainRateTension %f strainRateTension %f rateFactorTension %f rateFactorCompression %f\n", this->beta, this->strainRateTension, this->rateFactorTension, this->strainRateCompression, this->rateFactorCompression);
+    fprintf(file, "beta %f strainRateTension %f strainRateCompression %f rateFactorTension %f rateFactorCompression %f\n", this->beta, this->strainRateTension, this->rateFactorTension, this->strainRateCompression, this->rateFactorCompression);
 }
 
 void
@@ -247,34 +247,7 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
     double sig, rho, theta;
     //Calculate coordinates
     computeCoordinates(effectiveStress, sig, rho, theta);
-    //double equivStrain = this->computeEquivalentStrain(sig, rho, theta);
-    //FloatArray oldReducedStrain = status->giveReducedStrain();
-    //const auto &oldStrain = status->giveReducedStrain();
-    //const auto &strain = status->giveTempReducedStrain();
 
-    //const auto &strain = status->giveTempReducedStrain();
-
-    //Determine the principal values of the strain
-
-    //auto principalStrain = StructuralMaterial::computePrincipalValues(from_voigt_strain(strain) );     ///@todo CHECK
-
-    //Determine max and min value;
-   /* double maxStrain = -1.e20, minStrain = 1.e20;
-    for ( int k = 1; k <= principalStrain.giveSize(); k++ ) {
-        //maximum
-        if ( principalStrain.at(k) > maxStrain ) {
-            maxStrain = principalStrain.at(k);
-        }
-
-        //minimum
-        if ( principalStrain.at(k) < minStrain ) {
-            minStrain = principalStrain.at(k);
-        }
-    }
-    //tempEquivStrain = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective);
-    double strainRate;
-    double oldRateStrain = status->giveRateStrain();
-*/
     int unAndReloadingFlag = checkForUnAndReloading(tempEquivStrain, minEquivStrain, D, gp);
 
     //    double tempStrainRate = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
@@ -438,7 +411,7 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
 
 
 double
-ConcreteDPM2Rate::computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld) const
+ConcreteDPM2Rate::computeDamageParamTension(double equivStrain, double KappaDTensionOne, double KappaDTensionTwo, double le, double omegaOld) const
 {
     double omega = 0.;
 
@@ -448,21 +421,21 @@ ConcreteDPM2Rate::computeDamageParamTension(double equivStrain, double kappaOne,
     double help;
     if ( equivStrain > e0 * ( 1. - yieldTolDamage ) ) {
         if ( softeningType == 0 ) { //linear
-            omega = ( this->eM * equivStrain * wf - ftTemp * wf + ftTemp * kappaOne * le ) /
-                ( this->eM * equivStrain * wf - ftTemp * le * kappaTwo );
+            omega = ( this->eM * equivStrain * wf - ftTemp * wf + ftTemp * KappaDTensionOne * le ) /
+                ( this->eM * equivStrain * wf - ftTemp * le * KappaDTensionTwo );
         } else if ( softeningType == 1 ) { //bilinear: Calculate damage parameter for both parts of bilinear curve  and check which fulfils limits.
-            omega = ( this->eM * equivStrain * wfOne - ftTemp * wfOne - ( this->ftOne - ftTemp ) * kappaOne * le ) /
-                ( this->eM * equivStrain * wfOne + ( this->ftOne - ftTemp ) * le * kappaTwo );
-            help = le * kappaOne + le * omega * kappaTwo;
+            omega = ( this->eM * equivStrain * wfOne - ftTemp * wfOne - ( this->ftOne - ftTemp ) * KappaDTensionOne * le ) /
+                ( this->eM * equivStrain * wfOne + ( this->ftOne - ftTemp ) * le * KappaDTensionTwo );
+            help = le * KappaDTensionOne + le * omega * KappaDTensionTwo;
 
             if ( help >= 0. && help < wfOne ) {
                 return omega;
             }
 
             omega = ( this->eM * equivStrain * ( wf - wfOne ) - this->ftOne * ( wf - wfOne ) +
-                this->ftOne * kappaOne * le  - this->ftOne * wfOne ) /
-                    ( this->eM * equivStrain * ( wf - wfOne )  - this->ftOne * le * kappaTwo );
-            help = le * kappaOne + le * omega * kappaTwo;
+                this->ftOne * KappaDTensionOne * le  - this->ftOne * wfOne ) /
+                    ( this->eM * equivStrain * ( wf - wfOne )  - this->ftOne * le * KappaDTensionTwo );
+            help = le * KappaDTensionOne + le * omega * KappaDTensionTwo;
 
             if ( help > wfOne && help < wf ) {
                 return omega;
@@ -476,8 +449,8 @@ ConcreteDPM2Rate::computeDamageParamTension(double equivStrain, double kappaOne,
             do {
                 nite++;
 
-                residual  = ( 1 - omega ) * this->eM * equivStrain - ftTemp * exp(-le * ( omega * kappaTwo + kappaOne ) / wf);
-                dResidualDOmega = -this->eM * equivStrain + ftTemp * le * kappaTwo / wf * exp(-le * ( omega * kappaTwo + kappaOne ) / wf);
+                residual  = ( 1 - omega ) * this->eM * equivStrain - ftTemp * exp(-le * ( omega * KappaDTensionTwo + KappaDTensionOne ) / wf);
+                dResidualDOmega = -this->eM * equivStrain + ftTemp * le * KappaDTensionTwo / wf * exp(-le * ( omega * KappaDTensionTwo + KappaDTensionOne ) / wf);
 
                 omega -= residual / dResidualDOmega;
                 if ( nite > newtonIter ) {
