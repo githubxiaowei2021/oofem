@@ -80,7 +80,7 @@ ConcreteDPM2RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
 {
     // Call corresponding function of the parent class to print
     ConcreteDPM2Status::printOutputAt(file, tStep);
-    fprintf(file, "beta %f strainRateTension %f strainRateCompression %f rateFactorTension %f rateFactorCompression %f\n", this->beta, this->strainRateTension, this->rateFactorTension, this->strainRateCompression, this->rateFactorCompression);
+    fprintf(file, "beta %f strainRateTension %f strainRateCompression %f rateFactorTension %f rateFactorCompression %f\n", this->beta, this->strainRateTension, this->strainRateCompression, this->rateFactorTension, this->rateFactorCompression);
 }
 
 void
@@ -257,7 +257,9 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
     //Rate factor in compression can be computed directly from strain rate
     //double tempStrainRateCompression = (minStrain - oldRateStrain) / deltaTime * this->fc / this->ft;
 
-    double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft;
+    //double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * tempDamageCompression / tempDamageTension ;
+    double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft ;
+    //double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
     double tempRateFactorCompression = computeRateFactorCompression(tempStrainRateCompression, gp, tStep);
 
     //Rate factor in tension has to be made mesh independent once damage has started, because the model is based on the crack band approach
@@ -559,12 +561,12 @@ ConcreteDPM2Rate::computeRateFactorCompression(double strainRate,
     //For compression according to Model Code 2010
     double rateFactorCompression = 1.;
     double strainRateRatioCompression = strainRate / 30.e-6 ;
-    if ( strainRate < 30.e-6 ) {
+    if ( strainRate < this->acOne ) {
       rateFactorCompression = 1.;
-    } else if ( 30.e-6 < strainRate && strainRate < 30. ) {
-      rateFactorCompression = pow(strainRateRatioCompression, 0.014);
-    } else if ( 30. < strainRate ) {
-      rateFactorCompression =  0.012 * pow(strainRateRatioCompression, 0.333);
+    } else if ( this->acOne < strainRate && strainRate < this->acTwo ) {
+      rateFactorCompression = pow(strainRateRatioCompression, this->acThree);
+    } else {
+      rateFactorCompression =  this->acFour * pow(strainRateRatioCompression, this->acFive);
     }    
 
     return rateFactorCompression;
