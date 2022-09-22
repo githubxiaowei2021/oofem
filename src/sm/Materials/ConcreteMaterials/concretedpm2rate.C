@@ -80,7 +80,7 @@ ConcreteDPM2RateStatus::printOutputAt(FILE *file, TimeStep *tStep) const
 {
     // Call corresponding function of the parent class to print
     ConcreteDPM2Status::printOutputAt(file, tStep);
-    fprintf(file, "beta %f strainRateTension %f strainRateCompression %f rateFactorTension %f rateFactorCompression %f\n", this->beta, this->strainRateTension, this->rateFactorTension, this->strainRateCompression, this->rateFactorCompression);
+    fprintf(file, "beta %f strainRateTension %f strainRateCompression %f rateFactorTension %f rateFactorCompression %f\n", this->beta, this->strainRateTension, this->strainRateCompression, this->rateFactorTension, this->rateFactorCompression);
 }
 
 void
@@ -232,6 +232,7 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
     int unAndReloadingFlag = checkForUnAndReloading(tempEquivStrain, minEquivStrain, D, gp);
 
     FloatArrayF<2> tempRateFactor;
+
     //For tempStrainRateCompression should this be (tempEquivStrain - minEquivStrain)?
     double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft;
     double tempRateFactorCompression = computeRateFactorCompression(tempStrainRateCompression, gp, tStep);
