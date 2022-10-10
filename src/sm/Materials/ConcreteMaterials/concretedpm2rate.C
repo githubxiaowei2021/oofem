@@ -162,8 +162,6 @@ ConcreteDPM2RateStatus::restoreContext(DataStream &stream, ContextMode mode)
     }
   
 }
-
-
   
   //***************************
   //ConcreteDPM2Rate Class
@@ -178,16 +176,8 @@ ConcreteDPM2Rate::ConcreteDPM2Rate(int n, Domain *d) :
 void
 ConcreteDPM2Rate::initializeFrom(InputRecord &ir)
 {
-    // call the corresponding service for the linear elastic material
+
     ConcreteDPM2::initializeFrom(ir);
-
-
-
-    //atOne = 1.e-6
-    //atTwo = 10
-    //atThree = 0.018
-    //atFour = 0.0062
-    //atFive = 0.333
     
     this->atOne = 1.e-6;
     IR_GIVE_OPTIONAL_FIELD(ir, this->atOne, _IFT_ConcreteDPM2Rate_atOne);
@@ -200,13 +190,6 @@ ConcreteDPM2Rate::initializeFrom(InputRecord &ir)
     this->atFive = 0.333;
     IR_GIVE_OPTIONAL_FIELD(ir, this->atFive, _IFT_ConcreteDPM2Rate_atFive);
 
-
-  //acOne = 30.e-6
-    //acTwo = 30
-    //acThree = 0.014
-    //acFour = 0.012
-    //acFive = 0.333
-  
     this->acOne = 30.e-6;
     IR_GIVE_OPTIONAL_FIELD(ir, this->acOne, _IFT_ConcreteDPM2Rate_acOne);
     this->acTwo = 30;
@@ -216,12 +199,10 @@ ConcreteDPM2Rate::initializeFrom(InputRecord &ir)
     this->acFour = 0.012;
     IR_GIVE_OPTIONAL_FIELD(ir, this->acFour, _IFT_ConcreteDPM2Rate_acFour);
     this->acFive = 0.333;
-    IR_GIVE_OPTIONAL_FIELD(ir, this->acFive, _IFT_ConcreteDPM2Rate_acFive);
-    
+    IR_GIVE_OPTIONAL_FIELD(ir, this->acFive, _IFT_ConcreteDPM2Rate_acFive);  
 }
 
   
-
 FloatArrayF< 2 >
 ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
                             const FloatMatrixF< 6, 6 > &D,
@@ -247,43 +228,11 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
     double sig, rho, theta;
     //Calculate coordinates
     computeCoordinates(effectiveStress, sig, rho, theta);
-    //double equivStrain = this->computeEquivalentStrain(sig, rho, theta);
-    //FloatArray oldReducedStrain = status->giveReducedStrain();
-    //const auto &oldStrain = status->giveReducedStrain();
-    //const auto &strain = status->giveTempReducedStrain();
 
-    //const auto &strain = status->giveTempReducedStrain();
-
-    //Determine the principal values of the strain
-
-    //auto principalStrain = StructuralMaterial::computePrincipalValues(from_voigt_strain(strain) );     ///@todo CHECK
-
-    //Determine max and min value;
-   /* double maxStrain = -1.e20, minStrain = 1.e20;
-    for ( int k = 1; k <= principalStrain.giveSize(); k++ ) {
-        //maximum
-        if ( principalStrain.at(k) > maxStrain ) {
-            maxStrain = principalStrain.at(k);
-        }
-
-        //minimum
-        if ( principalStrain.at(k) < minStrain ) {
-            minStrain = principalStrain.at(k);
-        }
-    }
-    //tempEquivStrain = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective);
-    double strainRate;
-    double oldRateStrain = status->giveRateStrain();
-*/
     int unAndReloadingFlag = checkForUnAndReloading(tempEquivStrain, minEquivStrain, D, gp);
 
-    //    double tempStrainRate = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
-
     FloatArrayF<2> tempRateFactor;
-
-    //Rate factor in compression can be computed directly from strain rate
-    //double tempStrainRateCompression = (minStrain - oldRateStrain) / deltaTime * this->fc / this->ft;
-
+    //For tempStrainRateCompression should this be (tempEquivStrain - minEquivStrain)?
     double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft;
     double tempRateFactorCompression = computeRateFactorCompression(tempStrainRateCompression, gp, tStep);
 
@@ -309,13 +258,12 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
       tempRateFactorTension = computeRateFactorTension(tempStrainRateTension, gp, tStep);	  
     }
 
+    //Update the status here.
     status->setTempStrainRateTension(tempStrainRateTension);
     status->setTempRateFactorTension(tempRateFactorTension);
     status->setTempBeta(tempBeta);
     status->setTempStrainRateCompression(tempStrainRateCompression);
     status->setTempRateFactorCompression(tempRateFactorCompression);
-
-
    
     //Compute equivalent strains for  tension and compression
     double tempEquivStrainTension = 0.;
@@ -341,7 +289,6 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
 
     if ( fTension < -yieldTolDamage && fCompression < -yieldTolDamage ) {
         //Neither tension nor compression is active
-
         tempKappaDTension = status->giveKappaDTension();
         tempKappaDTensionOne = status->giveKappaDTensionOne();
         tempKappaDTensionTwo = status->giveKappaDTensionTwo();
@@ -356,8 +303,8 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
         //Update tension history variables
         tempKappaDTension = tempEquivStrainTension;
         deltaPlasticStrainNorm = computeDeltaPlasticStrainNormTension(tempKappaDTension, status->giveKappaDTension(), gp);
-        tempKappaDTensionOne = status->giveKappaDTensionOne() + deltaPlasticStrainNorm / (ductilityMeasure * tempRateFactorTension);
-        tempKappaDTensionTwo = status->giveKappaDTensionTwo() + ( tempKappaDTension - status->giveKappaDTension() ) / ductilityMeasure*pow(tempRateFactorTension,2.);
+        tempKappaDTensionOne = status->giveKappaDTensionOne() + deltaPlasticStrainNorm / ductilityMeasure * tempRateFactorTension;
+        tempKappaDTensionTwo = status->giveKappaDTensionTwo() + ( tempKappaDTension - status->giveKappaDTension() ) / ductilityMeasure * pow(tempRateFactorTension,2.);
 
         //Nothing changes for compression history variables
         tempKappaDCompression = status->giveKappaDCompression();
@@ -381,7 +328,8 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
         //Update compression history variables
         tempKappaDCompression = tempEquivStrainCompression;
         deltaPlasticStrainNormCompression = computeDeltaPlasticStrainNormCompression(tempAlpha, tempKappaDCompression, status->giveKappaDCompression(), gp, rho);
-        tempKappaDCompressionOne = status->giveKappaDCompressionOne() + deltaPlasticStrainNormCompression /  (ductilityMeasure * tempRateFactorCompression);
+        tempKappaDCompressionOne = status->giveKappaDCompressionOne() + deltaPlasticStrainNormCompression /  ductilityMeasure * tempRateFactorCompression;
+	
         tempKappaDCompressionTwo = status->giveKappaDCompressionTwo() + ( tempKappaDCompression - status->giveKappaDCompression() ) / ductilityMeasure * pow(tempRateFactorCompression,2.);
 
         //Determine damage parameters
@@ -393,14 +341,14 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
         //Update tension history variables
         tempKappaDTension = tempEquivStrainTension;
         deltaPlasticStrainNormTension = computeDeltaPlasticStrainNormTension(tempKappaDTension, status->giveKappaDTension(), gp);
-        tempKappaDTensionOne = status->giveKappaDTensionOne() + deltaPlasticStrainNormTension / (ductilityMeasure * tempRateFactorTension);
+        tempKappaDTensionOne = status->giveKappaDTensionOne() + deltaPlasticStrainNormTension / ductilityMeasure * tempRateFactorTension;
         tempKappaDTensionTwo = status->giveKappaDTensionTwo() + ( tempKappaDTension - status->giveKappaDTension() ) / ductilityMeasure * pow(tempRateFactorTension,2.);
 
         //Update the compression history variables
         tempKappaDCompression = tempEquivStrainCompression;
         deltaPlasticStrainNormCompression =
 	  computeDeltaPlasticStrainNormCompression(tempAlpha, tempKappaDCompression, status->giveKappaDCompression(), gp, rho);
-        tempKappaDCompressionOne = status->giveKappaDCompressionOne() + deltaPlasticStrainNormCompression / (ductilityMeasure * tempRateFactorCompression);
+        tempKappaDCompressionOne = status->giveKappaDCompressionOne() + deltaPlasticStrainNormCompression / ductilityMeasure * tempRateFactorCompression;
         tempKappaDCompressionTwo = status->giveKappaDCompressionTwo() +
 	  ( tempKappaDCompression - status->giveKappaDCompression() ) / ductilityMeasure * pow(tempRateFactorCompression,2.);
 
@@ -433,9 +381,6 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
         tempDamageTension, tempDamageCompression
     };
 }
-
-
-
 
 double
 ConcreteDPM2Rate::computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld) const
@@ -548,20 +493,11 @@ ConcreteDPM2Rate::computeRateFactorTension(double strainRate,
 					   TimeStep *tStep) const
 {
 
-    //Tension
     //For tension according to Model Code 2010
     double rateFactorTension = 1.;
-    double strainRateRatioTension = strainRate / 1.e-6;
-
-    //atOne = 1.e-6
-    //atTwo = 10
-    //atThree = 0.018
-    //atFour = 0.0062
-    //atFive = 0.333
+    double strainRateRatioTension = strainRate / this->atOne;
     
-    if ( strainRate < this->atOne ) {
-      rateFactorTension = 1.;
-    } else if ( this->atOne < strainRate && strainRate < this->atTwo ) {
+    if (strainRate >this->atOne && strainRate < this->atTwo ) {
       rateFactorTension = pow(strainRateRatioTension, this->atThree);
     } else {
       rateFactorTension =  this->atFour * pow(strainRateRatioTension, this->atFive);
@@ -576,22 +512,13 @@ ConcreteDPM2Rate::computeRateFactorCompression(double strainRate,
 					   GaussPoint *gp,
 					   TimeStep *tStep) const
 {
-
-    //acOne = 30.e-6
-    //acTwo = 30
-    //acThree = 0.014
-    //acFour = 0.012
-    //acFive = 0.333
-  
     //For compression according to Model Code 2010
     double rateFactorCompression = 1.;
-    double strainRateRatioCompression = strainRate / 30.e-6 ;
-    if ( strainRate < 30.e-6 ) {
-      rateFactorCompression = 1.;
-    } else if ( 30.e-6 < strainRate && strainRate < 30. ) {
-      rateFactorCompression = pow(strainRateRatioCompression, 0.014);
-    } else if ( 30. < strainRate ) {
-      rateFactorCompression =  0.012 * pow(strainRateRatioCompression, 0.333);
+    double strainRateRatioCompression = strainRate / this->acOne ;
+    if ( this->acOne < strainRate && strainRate < this->acTwo ) {
+      rateFactorCompression = pow(strainRateRatioCompression, this->acThree);
+    } else if ( this->acTwo < strainRate ) {
+      rateFactorCompression =  this->acFour * pow(strainRateRatioCompression, this->acFive);
     }    
 
     return rateFactorCompression;
