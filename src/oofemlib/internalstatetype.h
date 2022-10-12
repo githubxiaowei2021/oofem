@@ -198,7 +198,7 @@ namespace oofem {
     ENUM_ITEM_WITH_VALUE(IST_ShearDissWork, 148) \
     ENUM_ITEM_WITH_VALUE(IST_ShearDeltaDissWork, 149) \
     ENUM_ITEM_WITH_VALUE(IST_CompressionDissWork, 150) \
-    ENUM_ITEM_WITH_VALUE(IST_CompressionDeltaDissWork, 151)      
+    ENUM_ITEM_WITH_VALUE(IST_CompressionDeltaDissWork, 151) \
     ENUM_ITEM_WITH_VALUE(IST_RateFactor, 152)
 
 /**
