@@ -219,6 +219,8 @@ namespace oofem {
 
         fprintf(file, " rateFactor %.10e,", this->rateFactor);
 
+    fprintf(file, " rateFactor %.10e,", this->rateFactor);
+
 #ifdef keep_track_of_dissipated_energy
         fprintf(file, " dissW %g, freeE %g, stressW %g ", this->dissWork, ( this->stressWork ) - ( this->dissWork ), this->stressWork);
 #endif
@@ -240,11 +242,9 @@ namespace oofem {
             THROW_CIOERR(iores);
         }
 
-
         if ( !stream.write(kappaP) ) {
             THROW_CIOERR(CIO_IOERR);
         }
-
 
         if ( !stream.write(le) ) {
             THROW_CIOERR(CIO_IOERR);
@@ -314,7 +314,6 @@ namespace oofem {
         if ( !stream.write(state_flag) ) {
             THROW_CIOERR(CIO_IOERR);
         }
-
 
 #ifdef keep_track_of_dissipated_energy
         if ( !stream.write(stressWork) ) {
@@ -1642,7 +1641,6 @@ namespace oofem {
             returnType = RT_Regular;
         }
     }
-
 
     double
     ConcreteDPM2::performVertexReturn(FloatArrayF < 6 > &effectiveStress,
