@@ -99,7 +99,7 @@ public:
     /// Constructor for sized array. Data is zeroed.
     FloatArray(int n = 0) : values(n) { }
     /// Disallow double parameter, which can otherwise give unexpected results.
-    FloatArray(double)  = delete;
+    FloatArray(double)  = default;
     /// Copy constructor. Creates the array from another array.
     FloatArray(const FloatArray &src) : values(src.values) { }
     /// Move constructor. Creates the array from another array.

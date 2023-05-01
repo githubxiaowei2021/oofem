@@ -234,7 +234,8 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
     FloatArrayF<2> tempRateFactor;
 
     //For tempStrainRateCompression should this be (tempEquivStrain - minEquivStrain)?
-    double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft;
+    //double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft;
+    double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * tempAlpha * this->fc / this->ft;
     double tempRateFactorCompression = computeRateFactorCompression(tempStrainRateCompression, gp, tStep);
 
     //Rate factor in tension has to be made mesh independent once damage has started, because the model is based on the crack band approach
@@ -330,7 +331,7 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
         tempKappaDCompression = tempEquivStrainCompression;
         deltaPlasticStrainNormCompression = computeDeltaPlasticStrainNormCompression(tempAlpha, tempKappaDCompression, status->giveKappaDCompression(), gp, rho);
         tempKappaDCompressionOne = status->giveKappaDCompressionOne() + deltaPlasticStrainNormCompression /  ductilityMeasure * tempRateFactorCompression;
-	
+
         tempKappaDCompressionTwo = status->giveKappaDCompressionTwo() + ( tempKappaDCompression - status->giveKappaDCompression() ) / ductilityMeasure * pow(tempRateFactorCompression,2.);
 
         //Determine damage parameters
