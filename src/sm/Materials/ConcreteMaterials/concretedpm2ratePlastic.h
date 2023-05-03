@@ -47,10 +47,10 @@
 
 #define _IFT_ConcreteDPM2RatePlastic_Name "con2dpmrateplastic"
 
-#define _IFT_ConcreteDPM2RatePlastic_Ccompression "cc"
-#define _IFT_ConcreteDPM2RatePlastic_Kapparate0compression "k0ratec"
+#define _IFT_ConcreteDPM2RatePlastic_cCompression "cc"
+#define _IFT_ConcreteDPM2RatePlastic_kappaRate0Compression "k0ratec"
 
-#define _IFT_ConcreteDPM2RatePlastic_Ctension "ct"
+#define _IFT_ConcreteDPM2RatePlastic_cTension "ct"
 #define _IFT_ConcreteDPM2RatePlastic_Kapparate0tension "k0ratet"
 
 

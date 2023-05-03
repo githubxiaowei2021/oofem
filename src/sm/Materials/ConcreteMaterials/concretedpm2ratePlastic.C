@@ -96,7 +96,6 @@ namespace oofem {
     {
         ConcreteDPM2Status::restoreContext(stream, mode);
         contextIOResultType iores;
-
     }
 
     //***************************
@@ -114,16 +113,16 @@ namespace oofem {
     {
         ConcreteDPM2::initializeFrom(ir);
 
-        this->Ccompression = 1.e-6;
-        IR_GIVE_OPTIONAL_FIELD(ir, this->cCompression, _IFT_ConcreteDPM2RatePlastic_Ccompression);
-        this->Kapparate0compression = 10;
-        IR_GIVE_OPTIONAL_FIELD(ir, this->kappaRate0Compression, _IFT_ConcreteDPM2RatePlastic_Kapparate0compression);
+        this->cCompression = 1.e-6;
+        IR_GIVE_OPTIONAL_FIELD(ir, this->cCompression, _IFT_ConcreteDPM2RatePlastic_cCompression);
+        this->kappaRate0Compression = 10;
+        IR_GIVE_OPTIONAL_FIELD(ir, this->kappaRate0Compression, _IFT_ConcreteDPM2RatePlastic_kappaRate0Compression);
 
-        //this->Ctension = 0.01935;
-        this->Ctension = 0.01935;
-        IR_GIVE_OPTIONAL_FIELD(ir, this->cTension, _IFT_ConcreteDPM2RatePlastic_Ctension);
+        //this->cTension = 0.01935;
+        this->cTension = 0.01935;
+        IR_GIVE_OPTIONAL_FIELD(ir, this->cTension, _IFT_ConcreteDPM2RatePlastic_cTension);
         //this->Kapparate0tension = 0.00000434165;
-        this->Kapparate0tension = 0.00000434165;
+        this->kappaRate0Tension = 0.00000434165;
         IR_GIVE_OPTIONAL_FIELD(ir, this->kappaRate0Tension, _IFT_ConcreteDPM2RatePlastic_Kapparate0tension);
     }
 
@@ -155,31 +154,31 @@ namespace oofem {
 
         //  compute elliptic function r
         double rFunction = ( 4. * ( 1. - pow(ecc, 2.) ) * pow(cos(theta), 2.) +
-                             pow( ( 2. * ecc - 1. ), 2.) ) /
+                             pow( ( 2. * ecc - 1. ), 2. ) ) /
                            ( 2. * ( 1. - pow(ecc, 2.) ) * cos(theta) +
                              ( 2. * ecc - 1. ) * sqrt(4. * ( 1. - pow(ecc, 2.) ) * pow(cos(theta), 2.)
                                                       + 5. * pow(ecc, 2.) - 4. * ecc) );
 
-        double fcyield = this->fc * ( 1 + Ccompression * log(1 + tempKappaRate / Kapparate0compression) );
-        double ftyield = this->ft * ( 1 + Ctension * log(1 + tempKappaRate / Kapparate0tension) );
-        double myield = 3. * ( pow(fcyield, 2.) - pow(ftyield, 2.) ) / ( fcyield * ftyield ) * this->ecc / ( this->ecc + 1. );
+        double fcYield = this->fc * ( 1 + cCompression * log(1 + tempKappaRate / kappaRate0Compression) );
+        double ftYield = this->ft * ( 1 + cTension * log(1 + tempKappaRate / kappaRate0Tension) );
+        double myield = 3. * ( pow(fcYield, 2.) - pow(ftYield, 2.) ) / ( fcYield * ftYield ) * this->ecc / ( this->ecc + 1. );
 
         //compute help function Al
-        double Al = ( 1. - yieldHardOne ) * pow( ( sig / fcyield + rho / ( sqrt(6.) * fcyield ) ), 2.) +
-                    sqrt(3. / 2.) * rho / fcyield;
+        double Al = ( 1. - yieldHardOne ) * pow( ( sig / fcYield + rho / ( sqrt(6.) * fcYield ) ), 2. ) +
+                    sqrt(3. / 2.) * rho / fcYield;
 
 
 
 
         //Compute yield equation
         return pow(Al, 2.) +
-               pow(yieldHardOne, 2.) * yieldHardTwo * myield * ( sig / fcyield + rho * rFunction / ( sqrt(6.) * fcyield ) ) -
+               pow(yieldHardOne, 2.) * yieldHardTwo * myield * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) ) -
                pow(yieldHardOne, 2.) * pow(yieldHardTwo, 2.);
     }
 
 
     //    Xiaowei, you have extended computeDfDkappa to take more variables. Therefore, everywhere where computeDFDKappa is called you need to make the schange, too. For instance, computeJacobian, computeFullJacobian. In those funtions, you will need to access deltaTime.
-    
+
     double
     ConcreteDPM2RatePlastic::computeDFDKappa(double sig,
                                              double rho,
@@ -206,43 +205,43 @@ namespace oofem {
 
         //status->setTempKappaRate(tempKappaRate);
 
-        double fcyield = fc * ( 1 + Ccompression * log(1 + tempKappaRate / Kapparate0compression) );
-        double ftyield = ft * ( 1 + Ctension * log(1 + tempKappaRate / Kapparate0tension) );
-        double myield = 3. * ( pow(fcyield, 2.) - pow(ftyield, 2.) ) / ( fcyield * ftyield ) * this->ecc / ( this->ecc + 1. );
+        double fcYield = fc * ( 1 + cCompression * log(1 + tempKappaRate / kappaRate0Compression) );
+        double ftYield = ft * ( 1 + cTension * log(1 + tempKappaRate / kappaRate0Tension) );
+        double myield = 3. * ( pow(fcYield, 2.) - pow(ftYield, 2.) ) / ( fcYield * ftYield ) * this->ecc / ( this->ecc + 1. );
 
         //compute elliptic function r
         double rFunction =
-            ( 4. * ( 1. - pow(ecc, 2) ) * pow(cos(theta), 2) + pow( ( 2. * ecc - 1. ), 2) ) /
+            ( 4. * ( 1. - pow(ecc, 2) ) * pow(cos(theta), 2) + pow( ( 2. * ecc - 1. ), 2 ) ) /
             ( 2 * ( 1. - pow(ecc, 2) ) * cos(theta) + ( 2. * ecc - 1. ) * sqrt(4. * ( 1. - pow(ecc, 2) ) * pow(cos(theta), 2) + 5. * pow(ecc, 2) - 4. * ecc) );
 
         //compute help functions Al, Bl
-        double Al = ( 1. - yieldHardOne ) * pow( ( sig / fcyield + rho / ( sqrt(6.) * fcyield ) ), 2. ) + sqrt(3. / 2.) * rho / fcyield;
+        double Al = ( 1. - yieldHardOne ) * pow( ( sig / fcYield + rho / ( sqrt(6.) * fcYield ) ), 2.) + sqrt(3. / 2.) * rho / fcYield;
 
 
-        double Bl = sig / fcyield + rho / ( fcyield * sqrt(6.) );
+        double Bl = sig / fcYield + rho / ( fcYield * sqrt(6.) );
         double dFDYieldHardOne = -2. * Al * pow(Bl, 2.)
-                                 + 2. * yieldHardOne * yieldHardTwo * myield * ( sig / fcyield + rho * rFunction / ( sqrt(6.) * fcyield ) ) - 2. * yieldHardOne * pow(yieldHardTwo, 2.);
+                                 + 2. * yieldHardOne * yieldHardTwo * myield * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) ) - 2. * yieldHardOne * pow(yieldHardTwo, 2.);
 
-        double dFDYieldHardTwo = pow(yieldHardOne, 2.) * myield * ( sig / fcyield + rho * rFunction / ( sqrt(6.) * fcyield ) ) - 2. * yieldHardTwo * pow(yieldHardOne, 2.);
+        double dFDYieldHardTwo = pow(yieldHardOne, 2.) * myield * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) ) - 2. * yieldHardTwo * pow(yieldHardOne, 2.);
 
 
 
-	//Xiaowei, if possible can you give them names so that we know which these terms are? Something like "double dFcDkappaRate" or equivalent.
-	//Also, follow the OOFEM coding rules. New word in names starts with captial letter. So, "fcYield, ..." For variables, small letters at the start. There is a document on the OOFEM webpage which explains everything.
-	
-        double T1 = ft * Ctension * 1 / ( tempKappaRate + Kapparate0tension );
-        double C1 = fc * Ccompression * 1 / ( tempKappaRate + Kapparate0compression );
+        //Xiaowei, if possible can you give them names so that we know which these terms are? Something like "double dFcDkappaRate" or equivalent.
+        //Also, follow the OOFEM coding rules. New word in names starts with captial letter. So, "fcYield, ..." For variables, small letters at the start. There is a document on the OOFEM webpage which explains everything.
 
-        double mT = ( ( -3 * ecc ) / ( ecc + 1 ) ) * ( ( ftyield * ftyield + fcyield * fcyield ) / ( fcyield * ftyield * ftyield ) );
-        double mC = ( ( 3 * ecc ) / ( ecc + 1 ) ) * ( ( ftyield * ftyield + fcyield * fcyield ) / ( fcyield * fcyield * ftyield ) );
+        double T1 = ft * cTension * 1 / ( tempKappaRate + kappaRate0Tension );
+        double C1 = fc * cCompression * 1 / ( tempKappaRate + kappaRate0Compression );
 
-        double T2 = mT * pow(yieldHardOne, 2.) * yieldHardTwo * ( sig / fcyield + rho * rFunction / ( sqrt(6.) * fcyield ) );
+        double mT = ( ( -3 * ecc ) / ( ecc + 1 ) ) * ( ( ftYield * ftYield + fcYield * fcYield ) / ( fcYield * ftYield * ftYield ) );
+        double mC = ( ( 3 * ecc ) / ( ecc + 1 ) ) * ( ( ftYield * ftYield + fcYield * fcYield ) / ( fcYield * fcYield * ftYield ) );
 
-        double C3 =  sig / fcyield + rho / ( sqrt(6.) * fcyield );
-        double C4 = -rho / ( sqrt(6.) * fcyield * fcyield ) - sig / ( fcyield * fcyield );
+        double T2 = mT * pow(yieldHardOne, 2.) * yieldHardTwo * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) );
 
-        double C2 = 2 * Al * ( 2 * ( 1 - yieldHardOne ) * C3 * C4 - sqrt(3. / 2.) * rho / ( fcyield * fcyield ) ) + mC * pow(yieldHardOne, 2.) * yieldHardTwo * ( sig / fcyield + rho * rFunction / ( sqrt(6.) * fcyield ) )
-                    - pow(yieldHardOne, 2.) * yieldHardTwo * myield / ( fcyield * fcyield ) * ( sig  + rho * rFunction / sqrt(6.) );
+        double C3 =  sig / fcYield + rho / ( sqrt(6.) * fcYield );
+        double C4 = -rho / ( sqrt(6.) * fcYield * fcYield ) - sig / ( fcYield * fcYield );
+
+        double C2 = 2 * Al * ( 2 * ( 1 - yieldHardOne ) * C3 * C4 - sqrt(3. / 2.) * rho / ( fcYield * fcYield ) ) + mC * pow(yieldHardOne, 2.) * yieldHardTwo * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) )
+                    - pow(yieldHardOne, 2.) * yieldHardTwo * myield / ( fcYield * fcYield ) * ( sig  + rho * rFunction / sqrt(6.) );
 
 
 
