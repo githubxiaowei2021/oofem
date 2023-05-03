@@ -32,8 +32,8 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef concretedpm2ratePlastic_h
-#define concretedpm2ratePlastic_h
+#ifndef concretedpm2rateplastic_h
+#define concretedpm2rateplastic_h
 
 #include "sm/Materials/ConcreteMaterials/concretedpm2.h"
 #include "sm/Materials/structuralmaterial.h"
@@ -45,13 +45,13 @@
 #include "gausspoint.h"
 #include "mathfem.h"
 
-#define _IFT_ConcreteDPM2RatePlastic_Name "con2dpmratePlastic"
+#define _IFT_ConcreteDPM2RatePlastic_Name "con2dpmrateplastic"
 
-#define _IFT_ConcreteDPM2RatePlastic_Ccompression "Ccompression"
-#define _IFT_ConcreteDPM2RatePlastic_Kapparate0compression "Kapparate0compression"
+#define _IFT_ConcreteDPM2RatePlastic_Ccompression "cc"
+#define _IFT_ConcreteDPM2RatePlastic_Kapparate0compression "k0ratec"
 
-#define _IFT_ConcreteDPM2RatePlastic_Ctension "Ctension"
-#define _IFT_ConcreteDPM2RatePlastic_Kapparate0tension "Kapparate0tension"
+#define _IFT_ConcreteDPM2RatePlastic_Ctension "ct"
+#define _IFT_ConcreteDPM2RatePlastic_Kapparate0tension "k0ratet"
 
 
 
@@ -65,9 +65,6 @@ class ConcreteDPM2RatePlasticStatus : public ConcreteDPM2Status
 {
 protected:
 
-    double KappaRate = 0.;
-    double tempKappaRate = 0.;
-    
 public:
     /// Constructor
     ConcreteDPM2RatePlasticStatus(GaussPoint *g);
@@ -86,25 +83,24 @@ public:
     //void setTempKappaRate(double newStrainRate) { tempKappaRate = newStrainRate; }
 
     const char *giveClassName() const override { return "ConcreteDPM2RatePlasticStatus"; }
-
 };
 
 
 
 /**
- * This class implements rate dependence for ConcreteDPM2
+ * This class implements rate dependence in the plasticity part for ConcreteDPM2
  * @author: Xiaowei Liu, Peter Grassl
  */
 class ConcreteDPM2RatePlastic : public ConcreteDPM2
 {
- protected:
-    double Ccompression;
-    double Kapparate0compression;
+protected:
+    double cCompression;
+    double kappaRate0Compression;
 
-    double Ctension;
-    double Kapparate0tension;
+    double cTension;
+    double kappaRate0Tension;
 
-  
+
 public:
     /// Constructor
     ConcreteDPM2RatePlastic(int n, Domain *d);
