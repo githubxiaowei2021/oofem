@@ -108,14 +108,25 @@ public:
     void initializeFrom(InputRecord &ir) override;
 
     const char *giveClassName() const override { return "ConcreteDPM2RatePlastic"; }
+    FloatArrayF < 2 >computeDamage(const FloatArrayF < 6 > & strain, const FloatMatrixF < 6, 6 > & D, double deltaTime, GaussPoint * gp, TimeStep * tStep, double tempAlpha, const FloatArrayF < 6 > & effectiveStress) const;
+
+    FloatArrayF < 6 >performPlasticityReturn(GaussPoint * gp, const FloatMatrixF < 6, 6 > & D, const FloatArrayF < 6 > & strain) const;
+
+
+    double performRegularReturn(FloatArrayF < 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double kappaP, GaussPoint *gp, double theta) const;
+
+    double performVertexReturn(FloatArrayF < 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double apexStress, double tempKappaP, GaussPoint *gp) const;
 
 
 
+    FloatMatrixF < 4, 4 >computeJacobian(double sig, double rho, double theta, double kappa, double deltaLambda, GaussPoint * gp) const;
 
     double computeYieldValue(double sig, double rho, double theta, double tempKappa, double deltaTime, GaussPoint *gp) const;
 
 
     double computeDFDKappa(double sig, double rho, double theta, double tempKappa, double deltaTime, GaussPoint *gp) const;
+
+    FloatMatrixF < 8, 8 >computeFullJacobian(const FloatArrayF < 6 > & stress, const double deltaLambda, GaussPoint * gp, TimeStep * atTime, const double tempKappa) const;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 

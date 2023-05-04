@@ -838,12 +838,12 @@ namespace oofem {
         status->letTempReducedStrainBe(strainVector);
 
         //Calculate time increment
-        double dt = deltaTime;
-        if ( dt == -1 ) {
+       
+        if ( deltaTime == -1 ) {
             if ( tStep->giveTimeIncrement() == 0 ) { //Problem with the first step. For some reason the time increment is zero
-                dt = 1.;
+               deltaTime = 1.;
             } else {
-                dt = tStep->giveTimeIncrement();
+               deltaTime = tStep->giveTimeIncrement();
             }
         }
 
@@ -859,7 +859,7 @@ namespace oofem {
 
         if ( this->damageFlag != 0 ) {//Apply damage
             alpha  = computeAlpha(effectiveStressTension, effectiveStressCompression, effectiveStress);
-            auto damages = computeDamage(strainVector, D, dt, gp, tStep, alpha, effectiveStress);
+            auto damages = computeDamage(strainVector, D, deltaTime, gp, tStep, alpha, effectiveStress);
 
             if ( this->damageFlag == 1 ) { //Default as described in IJSS CDPM2 article
                 stress = effectiveStressTension * ( 1. - damages.at(1) ) + effectiveStressCompression * ( 1. - damages.at(2) );
@@ -1873,6 +1873,8 @@ namespace oofem {
             residualsNorm.at(2) /= 2. * this->gM;
 
             normOfResiduals = norm(residualsNorm);
+
+            printf("normOfResiduals = %e\n", normOfResiduals);
 
             if ( std::isnan(normOfResiduals) ) {
                 returnResult = RR_NotConverged;
