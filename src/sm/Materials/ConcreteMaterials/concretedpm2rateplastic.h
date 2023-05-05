@@ -75,13 +75,6 @@ public:
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
 
-    //double giveKappaRate() const {return KappaRate;}
-
-
-
-    //double giveTempKappaRate() const { return tempKappaRate;}
-    //void setTempKappaRate(double newStrainRate) { tempKappaRate = newStrainRate; }
-
     const char *giveClassName() const override { return "ConcreteDPM2RatePlasticStatus"; }
 };
 
@@ -107,26 +100,27 @@ public:
 
     void initializeFrom(InputRecord &ir) override;
 
+    FloatArrayF< 6 >giveRealStressVector_3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep) const override;
+
     const char *giveClassName() const override { return "ConcreteDPM2RatePlastic"; }
-    FloatArrayF < 2 >computeDamage(const FloatArrayF < 6 > & strain, const FloatMatrixF < 6, 6 > & D, double deltaTime, GaussPoint * gp, TimeStep * tStep, double tempAlpha, const FloatArrayF < 6 > & effectiveStress) const;
+    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const;
 
-    FloatArrayF < 6 >performPlasticityReturn(GaussPoint * gp, const FloatMatrixF < 6, 6 > & D, const FloatArrayF < 6 > & strain) const;
+    FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double deltaTime) const;
 
+    double performRegularReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double kappaP, GaussPoint *gp, double theta, const double deltaTime) const;
 
-    double performRegularReturn(FloatArrayF < 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double kappaP, GaussPoint *gp, double theta) const;
-
-    double performVertexReturn(FloatArrayF < 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double apexStress, double tempKappaP, GaussPoint *gp) const;
-
+    double performVertexReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double apexStress, double tempKappaP, GaussPoint *gp, const double deltaTime) const;
 
 
-    FloatMatrixF < 4, 4 >computeJacobian(double sig, double rho, double theta, double kappa, double deltaLambda, GaussPoint * gp) const;
 
-    double computeYieldValue(double sig, double rho, double theta, double tempKappa, double deltaTime, GaussPoint *gp) const;
+    FloatMatrixF< 4, 4 >computeJacobian(double sig, double rho, double theta, double kappa, double deltaLambda, GaussPoint *gp, const double deltaTime) const;
+
+    double computeYieldValue(double sig, double rho, double theta, double tempKappa, const double deltaTime, GaussPoint *gp) const;
 
 
     double computeDFDKappa(double sig, double rho, double theta, double tempKappa, double deltaTime, GaussPoint *gp) const;
 
-    FloatMatrixF < 8, 8 >computeFullJacobian(const FloatArrayF < 6 > & stress, const double deltaLambda, GaussPoint * gp, TimeStep * atTime, const double tempKappa) const;
+    FloatMatrixF< 8, 8 >computeFullJacobian(const FloatArrayF< 6 > &stress, const double deltaLambda, GaussPoint *gp, TimeStep *atTime, const double tempKappa, const double deltaTime) const;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 
