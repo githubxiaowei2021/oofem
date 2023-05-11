@@ -268,6 +268,10 @@ namespace oofem {
 
             //Determine the damage parameters
             this->initDamaged(tempKappaDTension, strain, gp);
+
+            tempDamageTension = computeDamageParamTension(tempKappaDTension, tempKappaDTensionOne, tempKappaDTensionTwo, status->giveLe(), status->giveDamageTension(), rateFactor);
+
+            tempDamageCompression = computeDamageParamCompression(tempKappaDCompression, tempKappaDCompressionOne, tempKappaDCompressionTwo, status->giveDamageCompression(), rateFactor);
         }
         tempDamageTension = 0;
 
@@ -719,6 +723,8 @@ namespace oofem {
 	//Xiaowei: Check this. Your way of calculating tempKappaRate might have caused problems. Now it uses giveKappaP() and the tempKappa that is input of the function. The same in dfDKappa.
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
 
+        printf("tempKappaRate = %e\n", tempKappaRate);
+
         //  compute elliptic function r
         double rFunction = ( 4. * ( 1. - pow(ecc, 2.) ) * pow(cos(theta), 2.) +
                              pow( ( 2. * ecc - 1. ), 2.) ) /
@@ -801,10 +807,9 @@ namespace oofem {
 
         double dFdFt = dm0dFt * pow(yieldHardOne, 2.) * yieldHardTwo * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) );
 
-        double C3 =  sig / fcYield + rho / ( sqrt(6.) * fcYield );
-        double dC3dFc = -rho / ( sqrt(6.) * fcYield * fcYield ) - sig / ( fcYield * fcYield );
+        double dBldFc = -rho / ( sqrt(6.) * fcYield * fcYield ) - sig / ( fcYield * fcYield );
 
-        double dFdFc = 2 * Al * ( 2 * ( 1 - yieldHardOne ) * C3 * dC3dFc - sqrt(3. / 2.) * rho / ( fcYield * fcYield ) ) + dm0dFc * pow(yieldHardOne, 2.) * yieldHardTwo * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) )
+        double dFdFc = 2 * Al * ( 2 * ( 1 - yieldHardOne ) * Bl * dBldFc - sqrt(3. / 2.) * rho / ( fcYield * fcYield ) ) + dm0dFc * pow(yieldHardOne, 2.) * yieldHardTwo * ( sig / fcYield + rho * rFunction / ( sqrt(6.) * fcYield ) )
                        - pow(yieldHardOne, 2.) * yieldHardTwo * myield / ( fcYield * fcYield ) * ( sig  + rho * rFunction / sqrt(6.) );
 
 
@@ -813,7 +818,7 @@ namespace oofem {
         dFDKappa = dFDYieldHardOne * dYieldHardOneDKappa + dFDYieldHardTwo * dYieldHardTwoDKappa
                    + ( dFdFt * dFtdKapparate + dFdFc * dFcdKapparate ) / deltaTime;
 
-
+        //dFDKappa = dFDYieldHardOne * dYieldHardOneDKappa + dFDYieldHardTwo * dYieldHardTwoDKappa;
 
         /*
          * set dFDKappa to zero, if it becomes greater than zero.

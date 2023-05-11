@@ -103,6 +103,7 @@ public:
     FloatArrayF< 6 >giveRealStressVector_3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep) const override;
 
     const char *giveClassName() const override { return "ConcreteDPM2RatePlastic"; }
+
     FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const;
 
     FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double deltaTime) const;
