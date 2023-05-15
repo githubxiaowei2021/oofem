@@ -106,6 +106,20 @@ public:
 
     FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const;
 
+    double computeRateFactor(double alpha, double deltaTime, GaussPoint *gp, TimeStep *tStep) const;
+
+    double computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const;
+
+    double computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const;
+
+    int checkForUnAndReloading(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF < 6, 6 > &D, GaussPoint *gp) const;
+
+    double computeEquivalentStrain(double sig, double rho, double theta, GaussPoint *gp) const;
+
+    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor, GaussPoint *gp) const;
+    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor, GaussPoint *gp) const;
+    void initDamaged(double kappaD, const FloatArrayF < 6 > &strain, GaussPoint *gp) const;
+
     FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double deltaTime) const;
 
     double performRegularReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double kappaP, GaussPoint *gp, double theta, const double deltaTime) const;
