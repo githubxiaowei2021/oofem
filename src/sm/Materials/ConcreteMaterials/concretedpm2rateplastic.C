@@ -134,6 +134,7 @@ namespace oofem {
                                            GaussPoint * gp,
                                            TimeStep * tStep,
                                            double tempAlpha,
+                                           double tempKappa,
                                            const FloatArrayF < 6 > & effectiveStress) const
     {
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
@@ -153,11 +154,11 @@ namespace oofem {
         //Calculate coordinates
         computeCoordinates(effectiveStress, sig, rho, theta);
 
-        int unAndReloadingFlag = checkForUnAndReloading(tempEquivStrain, minEquivStrain, D, gp);
+        int unAndReloadingFlag = checkForUnAndReloading(tempEquivStrain, minEquivStrain, D, gp, tempKappa);
 
         double rateFactor;
         if ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) {
-            rateFactor = computeRateFactor(tempAlpha, deltaTime, gp, tStep);
+            rateFactor = computeRateFactor(tempAlpha);
         } else {
             rateFactor = status->giveRateFactor();
         }
@@ -175,10 +176,12 @@ namespace oofem {
             tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * ( minEquivStrain - status->giveEquivStrain() ) / rateFactor + ( tempAlpha * ( tempEquivStrain - minEquivStrain ) ) / rateFactor;
         }
 
-        double tempKappa;
+
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
         double ftYield = this->ft * ( 1 + cTension * log(1. + tempKappaRate / kappaRate0Tension) );
         double e01 = ftYield/eM;
+
+
         //If damage threshold is exceeded determine the rate factor from the previous step
         if ( ( tempEquivStrainTension > e01 || tempEquivStrainCompression > e01 ) &&
              ( ( status->giveDamageTension() == 0. ) && ( status->giveDamageCompression() == 0. ) ) && !tStep->isTheFirstStep() ) {
@@ -221,7 +224,7 @@ namespace oofem {
         } else if ( fTension >= -yieldTolDamage && fCompression < -yieldTolDamage ) { //Only tension is active
             //Update tension history variables
             tempKappaDTension = tempEquivStrainTension;
-            deltaPlasticStrainNorm = computeDeltaPlasticStrainNormTension(tempKappaDTension, status->giveKappaDTension(), gp);
+            deltaPlasticStrainNorm = computeDeltaPlasticStrainNormTension(tempKappaDTension, status->giveKappaDTension(), gp, tempKappa);
             tempKappaDTensionOne = status->giveKappaDTensionOne() + deltaPlasticStrainNorm / ductilityMeasure / rateFactor;
             tempKappaDTensionTwo = status->giveKappaDTensionTwo() + ( tempKappaDTension - status->giveKappaDTension() ) / ductilityMeasure;
 
@@ -231,9 +234,9 @@ namespace oofem {
             tempKappaDCompressionTwo = status->giveKappaDCompressionTwo();
 
             //Initialise damage with tensile history variable
-            this->initDamaged(tempKappaDTension, strain, gp);
+            this->initDamaged(tempKappaDTension, strain, gp, tempKappa);
 
-            tempDamageTension = computeDamageParamTension(tempKappaDTension, tempKappaDTensionOne, tempKappaDTensionTwo, status->giveLe(), status->giveDamageTension(), rateFactor, gp);
+            tempDamageTension = computeDamageParamTension(tempKappaDTension, tempKappaDTensionOne, tempKappaDTensionTwo, status->giveLe(), status->giveDamageTension(), rateFactor, gp, tempKappa);
 
             tempDamageCompression = status->giveDamageCompression();
         } else if ( fTension < -yieldTolDamage && fCompression >= -yieldTolDamage ) {
@@ -246,36 +249,36 @@ namespace oofem {
 
             //Update compression history variables
             tempKappaDCompression = tempEquivStrainCompression;
-            deltaPlasticStrainNormCompression = computeDeltaPlasticStrainNormCompression(tempAlpha, tempKappaDCompression, status->giveKappaDCompression(), gp, rho);
+            deltaPlasticStrainNormCompression = computeDeltaPlasticStrainNormCompression(tempAlpha, tempKappaDCompression, status->giveKappaDCompression(), gp, rho, tempKappa);
             tempKappaDCompressionOne = status->giveKappaDCompressionOne() + deltaPlasticStrainNormCompression / ( ductilityMeasure * rateFactor );
             tempKappaDCompressionTwo = status->giveKappaDCompressionTwo() + ( tempKappaDCompression - status->giveKappaDCompression() ) / ductilityMeasure;
 
             //Determine damage parameters
             tempDamageTension = status->giveDamageTension();
-            tempDamageCompression = computeDamageParamCompression(tempKappaDCompression, tempKappaDCompressionOne, tempKappaDCompressionTwo, status->giveDamageCompression(), rateFactor, gp);
+            tempDamageCompression = computeDamageParamCompression(tempKappaDCompression, tempKappaDCompressionOne, tempKappaDCompressionTwo, status->giveDamageCompression(), rateFactor, gp, tempKappa);
         } else if ( fTension >= -yieldTolDamage && fCompression >= -yieldTolDamage ) {
             //Both tension and compression is active
 
             //Update tension history variables
             tempKappaDTension = tempEquivStrainTension;
-            deltaPlasticStrainNormTension = computeDeltaPlasticStrainNormTension(tempKappaDTension, status->giveKappaDTension(), gp);
+            deltaPlasticStrainNormTension = computeDeltaPlasticStrainNormTension(tempKappaDTension, status->giveKappaDTension(), gp, tempKappa);
             tempKappaDTensionOne = status->giveKappaDTensionOne() + deltaPlasticStrainNormTension / ( ductilityMeasure * rateFactor );
             tempKappaDTensionTwo = status->giveKappaDTensionTwo() + ( tempKappaDTension - status->giveKappaDTension() ) / ductilityMeasure;
 
             //Update the compression history variables
             tempKappaDCompression = tempEquivStrainCompression;
             deltaPlasticStrainNormCompression =
-                computeDeltaPlasticStrainNormCompression(tempAlpha, tempKappaDCompression, status->giveKappaDCompression(), gp, rho);
+                computeDeltaPlasticStrainNormCompression(tempAlpha, tempKappaDCompression, status->giveKappaDCompression(), gp, rho, tempKappa);
             tempKappaDCompressionOne = status->giveKappaDCompressionOne() + deltaPlasticStrainNormCompression / ( ductilityMeasure * rateFactor );
             tempKappaDCompressionTwo = status->giveKappaDCompressionTwo() +
                                        ( tempKappaDCompression - status->giveKappaDCompression() ) / ductilityMeasure;
 
             //Determine the damage parameters
-            this->initDamaged(tempKappaDTension, strain, gp);
+            this->initDamaged(tempKappaDTension, strain, gp, tempKappa);
 
-            tempDamageTension = computeDamageParamTension(tempKappaDTension, tempKappaDTensionOne, tempKappaDTensionTwo, status->giveLe(), status->giveDamageTension(), rateFactor, gp);
+            tempDamageTension = computeDamageParamTension(tempKappaDTension, tempKappaDTensionOne, tempKappaDTensionTwo, status->giveLe(), status->giveDamageTension(), rateFactor, gp, tempKappa);
 
-            tempDamageCompression = computeDamageParamCompression(tempKappaDCompression, tempKappaDCompressionOne, tempKappaDCompressionTwo, status->giveDamageCompression(), rateFactor, gp);
+            tempDamageCompression = computeDamageParamCompression(tempKappaDCompression, tempKappaDCompressionOne, tempKappaDCompressionTwo, status->giveDamageCompression(), rateFactor, gp, tempKappa);
         }
         //tempDamageTension = 0;
 
@@ -303,12 +306,12 @@ namespace oofem {
     }
 
     double
-    ConcreteDPM2RatePlastic::computeRateFactor(double alpha, double deltaTime, GaussPoint *gp, TimeStep *tStep) const
+    ConcreteDPM2RatePlastic::computeRateFactor(double alpha) const
     {
         if ( this->strengthRateType == 0 ) {
             return 1;
         }
-
+/*
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
         const auto &strain = status->giveTempReducedStrain();
@@ -381,7 +384,7 @@ namespace oofem {
                 rateFactorCompression =  0.012 * pow(strainRateRatioCompression, 0.333);
             }
         }
-
+*/
         //double rateFactor = ( 1. - alpha ) * rateFactorTension + alpha * rateFactorCompression;
         double rateFactor = 1;
 
@@ -392,7 +395,7 @@ namespace oofem {
 
 
     double
-    ConcreteDPM2RatePlastic::computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const
+    ConcreteDPM2RatePlastic::computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp, double tempKappa) const
     {
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
@@ -404,7 +407,7 @@ namespace oofem {
         double deltaPlasticStrainNorm = 0;
 
         //Distinguish pre-peak, peak and post-peak
-        double tempKappa;
+
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
         double ftYield = this->ft * ( 1 + cTension * log(1. + tempKappaRate / kappaRate0Tension) );
         double e01 = ftYield/eM;
@@ -424,7 +427,7 @@ namespace oofem {
     }
 
     double
-    ConcreteDPM2RatePlastic::computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const
+    ConcreteDPM2RatePlastic::computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho, double tempKappa) const
     {
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
@@ -435,7 +438,7 @@ namespace oofem {
 
         double deltaPlasticStrainNorm = 0;
 
-        double tempKappa;
+
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
         double ftYield = this->ft * ( 1 + cTension * log(1. + tempKappaRate / kappaRate0Tension) );
         double e01 = ftYield/eM;
@@ -464,7 +467,7 @@ namespace oofem {
     }
 
     int
-    ConcreteDPM2RatePlastic::checkForUnAndReloading(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF < 6, 6 > &D, GaussPoint *gp) const
+    ConcreteDPM2RatePlastic::checkForUnAndReloading(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF < 6, 6 > &D, GaussPoint *gp, double tempKappa) const
     {
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
@@ -478,7 +481,7 @@ namespace oofem {
 
         double sigEffective, rhoEffective, thetaEffective;
         computeCoordinates(tempEffectiveStress, sigEffective, rhoEffective, thetaEffective);
-        tempEquivStrain = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp);
+        tempEquivStrain = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp, tempKappa);
         //Get the equivalent strain from the status
         double equivStrain = status->giveEquivStrain();
 
@@ -492,12 +495,12 @@ namespace oofem {
         //For slightly more than effective stress
         auto intermediateEffectiveStressPlus = effectiveStress + 0.01 * deltaEffectiveStress;
         computeCoordinates(intermediateEffectiveStressPlus, sigEffective, rhoEffective, thetaEffective);
-        double equivStrainPlus = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp);
+        double equivStrainPlus = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp, tempKappa);
 
         //For slightly less than temp effective stress
         auto intermediateEffectiveStressMinus = effectiveStress + 0.99 * deltaEffectiveStress;
         computeCoordinates(intermediateEffectiveStressMinus, sigEffective, rhoEffective, thetaEffective);
-        double tempEquivStrainMinus = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp);
+        double tempEquivStrainMinus = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp, tempKappa);
 
         //Check for unloading and reloading in the same step
         int unloadingFlag = 0;
@@ -510,7 +513,7 @@ namespace oofem {
             for ( double k = 1.0; k <= 100.0; k = k + 1.0 ) {
                 auto intermediateEffectiveStress = effectiveStress + k / 100. * deltaEffectiveStress;
                 computeCoordinates(intermediateEffectiveStress, sigEffective, rhoEffective, thetaEffective);
-                double midEquivStrain = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp);
+                double midEquivStrain = computeEquivalentStrain(sigEffective, rhoEffective, thetaEffective, gp, tempKappa);
 
                 if ( midEquivStrain <= minEquivStrain ) {
                     minEquivStrain = midEquivStrain;
@@ -525,7 +528,7 @@ namespace oofem {
 
 
     double
-    ConcreteDPM2RatePlastic::computeEquivalentStrain(double sig, double rho, double theta, GaussPoint *gp) const
+    ConcreteDPM2RatePlastic::computeEquivalentStrain(double sig, double rho, double theta, GaussPoint *gp, double tempKappa) const
     {
 
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
@@ -538,7 +541,7 @@ namespace oofem {
 
         double help = -0.5 * pHelp + sqrt(pow(pHelp, 2.) / 4. - qHelp);
 
-        double tempKappa;
+
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
         double ftYield = this->ft * ( 1 + cTension * log(1. + tempKappaRate / kappaRate0Tension) );
         double e01 = ftYield/eM;
@@ -552,7 +555,7 @@ namespace oofem {
     }
 
     double
-    ConcreteDPM2RatePlastic::computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor, GaussPoint *gp) const
+    ConcreteDPM2RatePlastic::computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor, GaussPoint *gp, double tempKappa) const
     {
 
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
@@ -575,7 +578,7 @@ namespace oofem {
             }
         }
 
-        double tempKappa;
+
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
         double ftYield = this->ft * ( 1 + cTension * log(1. + tempKappaRate / kappaRate0Tension) );
         double e01 = ftYield/eM;
@@ -639,7 +642,7 @@ namespace oofem {
 
 
     double
-    ConcreteDPM2RatePlastic::computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor, GaussPoint *gp) const
+    ConcreteDPM2RatePlastic::computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor, GaussPoint *gp, double tempKappa) const
     {
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
@@ -663,7 +666,7 @@ namespace oofem {
         double residual = 0.;
         double dResidualDOmega = 0.;
 
-        double tempKappa;
+
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
         double ftYield = this->ft * ( 1 + cTension * log(1. + tempKappaRate / kappaRate0Tension) );
         double e01 = ftYield/eM;
@@ -696,14 +699,15 @@ namespace oofem {
 
 
     void
-    ConcreteDPM2RatePlastic::initDamaged(double kappaD, const FloatArrayF < 6 > &strain, GaussPoint *gp) const
+    ConcreteDPM2RatePlastic::initDamaged(double kappaD, const FloatArrayF < 6 > &strain, GaussPoint *gp, double tempKappa) const
     {
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
-        double tempKappa;
+
         double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
         double ftYield = this->ft * ( 1 + cTension * log(1. + tempKappaRate / kappaRate0Tension) );
         double e01 = ftYield/eM;
+
 
 
         if ( kappaD <= e01 * ( 1. - yieldTolDamage ) ) {
@@ -1357,7 +1361,7 @@ namespace oofem {
 
 
     FloatArrayF < 6 >
-    ConcreteDPM2RatePlastic::giveRealStressVector_3d(const FloatArrayF < 6 > & fullStrainVector, GaussPoint * gp, TimeStep * tStep) const
+    ConcreteDPM2RatePlastic::giveRealStressVector_3d(const FloatArrayF < 6 > & fullStrainVector, GaussPoint * gp, TimeStep * tStep, double tempKappa) const
     {
         auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
@@ -1400,7 +1404,7 @@ namespace oofem {
 
         if ( this->damageFlag != 0 ) {//Apply damage
             alpha  = computeAlpha(effectiveStressTension, effectiveStressCompression, effectiveStress);
-            auto damages = computeDamage(strainVector, D, dt, gp, tStep, alpha, effectiveStress);
+            auto damages = computeDamage(strainVector, D, dt, gp, tStep, alpha, tempKappa, effectiveStress);
 
             if ( this->damageFlag == 1 ) { //Default as described in IJSS CDPM2 article
                 stress = effectiveStressTension * ( 1. - damages.at(1) ) + effectiveStressCompression * ( 1. - damages.at(2) );

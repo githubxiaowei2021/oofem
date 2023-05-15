@@ -100,25 +100,26 @@ public:
 
     void initializeFrom(InputRecord &ir) override;
 
-    FloatArrayF< 6 >giveRealStressVector_3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatArrayF< 6 >giveRealStressVector_3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep, double tempKappa) const;
 
     const char *giveClassName() const override { return "ConcreteDPM2RatePlastic"; }
 
-    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const;
+    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, double tempKappa, const FloatArrayF< 6 > &effectiveStress) const;
 
-    double computeRateFactor(double alpha, double deltaTime, GaussPoint *gp, TimeStep *tStep) const;
+    double computeRateFactor(double alpha) const;
 
-    double computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const;
+    double computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp, double tempKappa) const;
 
-    double computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const;
+    double computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho, double tempKappa) const;
 
-    int checkForUnAndReloading(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF < 6, 6 > &D, GaussPoint *gp) const;
+    int checkForUnAndReloading(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF < 6, 6 > &D, GaussPoint *gp, double tempKappa) const;
 
-    double computeEquivalentStrain(double sig, double rho, double theta, GaussPoint *gp) const;
+    double computeEquivalentStrain(double sig, double rho, double theta, GaussPoint *gp, double tempKappa) const;
 
-    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor, GaussPoint *gp) const;
-    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor, GaussPoint *gp) const;
-    void initDamaged(double kappaD, const FloatArrayF < 6 > &strain, GaussPoint *gp) const;
+    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor, GaussPoint *gp, double tempKappa) const;
+    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor, GaussPoint *gp, double tempKappa) const;
+
+    void initDamaged(double kappaD, const FloatArrayF < 6 > &strain, GaussPoint *gp, double tempKappa) const;
 
     FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double deltaTime) const;
 
