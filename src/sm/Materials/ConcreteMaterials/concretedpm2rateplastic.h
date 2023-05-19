@@ -104,22 +104,22 @@ public:
 
     const char *giveClassName() const override { return "ConcreteDPM2RatePlastic"; }
 
-    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const;
+    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const override;
 
-    double computeRateFactor(double alpha) const;
+   // double computeRateFactor(double alpha) const;
 
-    double computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const;
+    double computeDeltaPlasticStrainNormTensionP(double tempKappaD, double kappaD, GaussPoint *gp) const;
 
-    double computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const;
+    double computeDeltaPlasticStrainNormCompressionP(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const;
 
-    int checkForUnAndReloading(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF< 6, 6 > &D, GaussPoint *gp) const;
+    int checkForUnAndReloadingP(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF< 6, 6 > &D, GaussPoint *gp) const;
 
-    double computeEquivalentStrain(double sig, double rho, double theta, GaussPoint *gp) const;
+    double computeEquivalentStrainP(double sig, double rho, double theta, GaussPoint *gp) const;
 
     double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, GaussPoint *gp) const;
     double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, GaussPoint *gp) const;
 
-    void initDamaged(double kappaD, const FloatArrayF< 6 > &strain, GaussPoint *gp) const;
+    void initDamagedP(double kappaD, const FloatArrayF< 6 > &strain, GaussPoint *gp) const;
 
     FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double deltaTime) const;
 
@@ -135,6 +135,10 @@ public:
 
 
     double computeDFDKappa(double sig, double rho, double theta, double tempKappa, double deltaTime, GaussPoint *gp) const;
+
+    FloatArrayF < 2 >computeDFDInv(double sig, double rho, double theta, double tempKappa, GaussPoint * gp) const;
+
+    FloatArrayF < 6 >computeDFDStress(const FloatArrayF < 6 > & stress, double tempKappa, GaussPoint * gp) const;
 
     FloatMatrixF< 8, 8 >computeFullJacobian(const FloatArrayF< 6 > &stress, const double deltaLambda, GaussPoint *gp, TimeStep *atTime, const double tempKappa, const double deltaTime) const;
 
