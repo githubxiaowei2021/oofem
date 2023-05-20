@@ -65,6 +65,10 @@ namespace oofem {
     ConcreteDPM2RatePlasticStatus::initTempStatus()
     {
         ConcreteDPM2Status::initTempStatus();
+        this->tempKappaRate = this->KappaRate;
+        this->tempBeta = this->beta;
+
+
     }
 
 
@@ -79,7 +83,8 @@ namespace oofem {
     ConcreteDPM2RatePlasticStatus::updateYourself(TimeStep *tStep)
     {
         ConcreteDPM2Status::updateYourself(tStep);
-        //this->KappaRate = this->tempKappaRate;
+        this->KappaRate = this->tempKappaRate;
+        this->beta = this->tempBeta;
     }
 
 
@@ -89,6 +94,17 @@ namespace oofem {
         ConcreteDPM2Status::saveContext(stream, mode);
 
         contextIOResultType iores;
+
+        if ( !stream.write(KappaRate) ) {
+            THROW_CIOERR(CIO_IOERR);
+        }
+
+
+        if ( !stream.write(beta) ) {
+            THROW_CIOERR(CIO_IOERR);
+        }
+
+
     }
 
     void
@@ -96,6 +112,15 @@ namespace oofem {
     {
         ConcreteDPM2Status::restoreContext(stream, mode);
         contextIOResultType iores;
+
+        if ( !stream.write(KappaRate) ) {
+            THROW_CIOERR(CIO_IOERR);
+        }
+
+        if ( !stream.read(beta) ) {
+            THROW_CIOERR(CIO_IOERR);
+        }
+
     }
 
     //***************************
@@ -179,6 +204,29 @@ namespace oofem {
         double ftYield = this->ft * ( 1 + this->cTension * log(1. + tempKappaRate / this->kappaRate0Tension) );
         double e01 = ftYield / eM;
 
+        //Rate factor in tension has to be made mesh independent once damage has started, because the model is based on the crack band approach
+        double tempBeta = 0.;
+        if(status->giveTempDamageTension() == 0){
+            //Damage is zero
+            tempKappaRate = ( status->giveTempKappaP() - status->giveKappaP() ) / deltaTime;
+        }
+        else{
+            //Damage in previous step is not zero
+            tempBeta = status->giveTempBeta();
+            if(tempBeta == 0){
+                //Calculate tempBeta only once
+                tempBeta = status->giveTempKappaRate()/(status->giveLe()*
+                               ( status->giveTempKappaP() - status->giveKappaP() ) / deltaTime);
+            }
+
+            tempKappaRate = tempBeta*status->giveLe()*
+                ( status->giveTempKappaP() - status->giveKappaP() ) / deltaTime;
+
+        }
+        //Update the status here.
+
+        status->setTempKappaRate(tempKappaRate);
+        status->setTempBeta(tempBeta);
 
         //        //If damage threshold is exceeded determine the rate factor from the previous step
         //        if ( ( tempEquivStrainTension > e01 || tempEquivStrainCompression > e01 ) &&

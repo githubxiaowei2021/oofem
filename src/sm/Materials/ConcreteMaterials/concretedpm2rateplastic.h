@@ -64,6 +64,11 @@ namespace oofem {
 class ConcreteDPM2RatePlasticStatus : public ConcreteDPM2Status
 {
 protected:
+    double KappaRate = 0.;
+    double tempKappaRate = 0.;
+
+    double beta = 0.;
+    double tempBeta = 0.;
 
 public:
     /// Constructor
@@ -74,6 +79,15 @@ public:
     void printOutputAt(FILE *file, TimeStep *tStep) const override;
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
+
+    double giveKappaRate() const { return KappaRate;}
+    double giveBeta() const { return beta;}
+
+    double giveTempKappaRate() const { return tempKappaRate;}
+    double giveTempBeta() const { return tempBeta;}
+
+    void setTempKappaRate(double newKappaRate) { tempKappaRate = newKappaRate; }
+    void setTempBeta(double newBeta) { tempBeta = newBeta; }
 
     const char *giveClassName() const override { return "ConcreteDPM2RatePlasticStatus"; }
 };
