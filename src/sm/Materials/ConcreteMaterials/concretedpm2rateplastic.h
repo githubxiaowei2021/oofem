@@ -141,7 +141,12 @@ public:
 
     double performVertexReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double apexStress, double tempKappaP, GaussPoint *gp, const double deltaTime) const;
 
+    double computeFcYield(double tempKappa, double deltaTime, GaussPoint *gp) const;
+    double computeFtYield(double tempKappa, double deltaTime, GaussPoint *gp) const;
 
+    double computeDFtDKappa(double tempKappa, double deltaTime, GaussPoint *gp) const;
+
+    double computeDFcDKappa(double tempKappa, double deltaTime, GaussPoint *gp) const;
 
     FloatMatrixF< 4, 4 >computeJacobian(double sig, double rho, double theta, double kappa, double deltaLambda, GaussPoint *gp, const double deltaTime) const;
 
