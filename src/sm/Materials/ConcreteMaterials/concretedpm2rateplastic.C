@@ -1265,12 +1265,15 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
         //It is assumed that damage starts once tempKappaP is greater than 1.
         double tempBeta = 0.;
         double tempKappaRate = 0.;
+        double dFtDKappa = 0.;
         if(tempKappa == status->giveKappaP()){
             tempKappaRate = status->giveTempKappaRate();
+            dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime;
         }
         else if(status->giveKappaP() <= 1.){
             //Damage is zero
             tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
+            dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime;
         }
         else{
             //Damage in previous step is not zero
@@ -1285,6 +1288,7 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
             tempKappaRate = tempBeta*status->giveLe()*
                 ( tempKappa - status->giveKappaP() ) / deltaTime;
 
+            dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime *tempBeta*status->giveLe();
         }
 
 
@@ -1293,7 +1297,6 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
         status->setTempKappaRate(tempKappaRate);
 
 
-        double dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime *tempBeta*status->giveLe();
 
         return dFtDKappa;
 
