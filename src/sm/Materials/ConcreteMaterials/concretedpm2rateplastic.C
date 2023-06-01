@@ -585,11 +585,9 @@ ConcreteDPM2RatePlastic::computeDamageParamTension( double equivStrain, double k
     //                wfOneMod /= rateFactor;
     //            }
     //        }
-
-
-    double tempKappaRate = ( status->giveTempKappaP() - status->giveKappaP() ) / deltaTime;
-    double ftYield       = this->ft * ( 1 + cTension * log( 1. + tempKappaRate / kappaRate0Tension ) );
-    double e01           = ftYield / this->eM;
+    double tempKappaP = status->giveTempKappaP();
+    double ftYield    = computeFtYield( tempKappaP, deltaTime, gp );
+    double e01        = ftYield / this->eM;
 
     double ftTemp = ftYield * ( 1. - yieldTolDamage );
 
@@ -657,9 +655,9 @@ ConcreteDPM2RatePlastic::computeDamageParamCompression( double equivStrain, doub
         return 0.;
     }
 
-    double tempKappaRate = ( status->giveTempKappaP() - status->giveKappaP() ) / deltaTime;
-    double ftYield       = this->ft * ( 1 + cTension * log( 1. + tempKappaRate / kappaRate0Tension ) );
-    double e01           = ftYield / eM;
+    double tempKappaP = status->giveTempKappaP();
+    double ftYield    = computeFtYield( tempKappaP, deltaTime, gp );
+    double e01        = ftYield / this->eM;
 
 
     double ftTemp           = ftYield * ( 1. - yieldTolDamage );
@@ -710,11 +708,9 @@ void ConcreteDPM2RatePlastic::initDamagedP( double kappaD, const FloatArrayF<6> 
 {
     auto status = static_cast<ConcreteDPM2RatePlasticStatus *>( this->giveStatus( gp ) );
 
-
-    double tempKappaRate = ( status->giveTempKappaP() - status->giveKappaP() ) / deltaTime;
-    double ftYield       = this->ft * ( 1 + cTension * log( 1. + tempKappaRate / kappaRate0Tension ) );
-    double e01           = ftYield / eM;
-
+    double tempKappaP = status->giveTempKappaP();
+    double ftYield    = computeFtYield( tempKappaP, deltaTime, gp );
+    double e01        = ftYield / this->eM;
 
     if ( kappaD <= e01 * ( 1. - yieldTolDamage ) ) {
         return;
@@ -1172,15 +1168,20 @@ ConcreteDPM2RatePlastic::computeYieldValue( double sig,
     double yieldHardTwo = computeHardeningTwo( tempKappa );
 
     // Xiaowei: Check this. Your way of calculating tempKappaRate might have caused problems. Now it uses giveKappaP() and the tempKappa that is input of the function. The same in dfDKappa.
-    double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
+    //double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
 
     //  printf("tempKappaRate = %e\n", tempKappaRate);
 
     //  compute elliptic function r
     double rFunction = ( 4. * ( 1. - pow( ecc, 2. ) ) * pow( cos( theta ), 2. ) + pow( ( 2. * ecc - 1. ), 2. ) ) / ( 2. * ( 1. - pow( ecc, 2. ) ) * cos( theta ) + ( 2. * ecc - 1. ) * sqrt( 4. * ( 1. - pow( ecc, 2. ) ) * pow( cos( theta ), 2. ) + 5. * pow( ecc, 2. ) - 4. * ecc ) );
 
-    double fcYield = this->fc * ( 1 + cCompression * log( 1. + tempKappaRate / kappaRate0Compression ) );
-    double ftYield = this->ft * ( 1 + cTension * log( 1. + tempKappaRate / kappaRate0Tension ) );
+    double tempKappaP = status->giveTempKappaP();
+    double ftYield    = computeFtYield( tempKappaP, deltaTime, gp );
+    double e01        = ftYield / this->eM;
+
+    double fcYield    = computeFcYield( tempKappaP, deltaTime, gp );
+
+
 
     double myield = 3. * ( pow( fcYield, 2. ) - pow( ftYield, 2. ) ) / ( fcYield * ftYield ) * this->ecc / ( this->ecc + 1. );
 
@@ -1244,6 +1245,7 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
     auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
     double tempKappaRate = 0.;
+
     if(tempKappa == status->giveKappaP()){
         tempKappaRate = status->giveTempKappaRate();
     }
@@ -1252,6 +1254,7 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
         tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
     }
     double dFcDKappaRate = fc * cCompression * 1. / ( tempKappaRate + kappaRate0Compression )/deltaTime;
+
     return dFcDKappaRate;
 
 }
@@ -1269,11 +1272,13 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
         if(tempKappa == status->giveKappaP()){
             tempKappaRate = status->giveTempKappaRate();
             dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime;
+
         }
         else if(status->giveKappaP() <= 1.){
             //Damage is zero
             tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
-            dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime;
+           dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime;
+
         }
         else{
             //Damage in previous step is not zero
@@ -1288,7 +1293,8 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
             tempKappaRate = tempBeta*status->giveLe()*
                 ( tempKappa - status->giveKappaP() ) / deltaTime;
 
-            dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime *tempBeta*status->giveLe();
+           dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime *tempBeta*status->giveLe();
+
         }
 
 
