@@ -66,7 +66,8 @@ ConcreteDPM2RatePlasticStatus::ConcreteDPM2RatePlasticStatus( GaussPoint *gp ) :
 void ConcreteDPM2RatePlasticStatus::initTempStatus()
 {
     ConcreteDPM2Status::initTempStatus();
-    this->tempKappaRate = this->KappaRate;
+    this->tempKappaRateTension = this->kappaRateTension;
+    this->tempKappaRateCompression = this->kappaRateCompression;
     this->tempBeta      = this->beta;
 }
 
@@ -80,7 +81,8 @@ void ConcreteDPM2RatePlasticStatus::printOutputAt( FILE *file, TimeStep *tStep )
 void ConcreteDPM2RatePlasticStatus::updateYourself( TimeStep *tStep )
 {
     ConcreteDPM2Status::updateYourself( tStep );
-    this->KappaRate = this->tempKappaRate;
+    this->kappaRateTension = this->tempKappaRateTension;
+    this->kappaRateCompression = this->tempKappaRateCompression;
     this->beta      = this->tempBeta;
 }
 
@@ -91,10 +93,13 @@ void ConcreteDPM2RatePlasticStatus::saveContext( DataStream &stream, ContextMode
 
     contextIOResultType iores;
 
-    if ( !stream.write( KappaRate ) ) {
+    if ( !stream.write( kappaRateTension ) ) {
         THROW_CIOERR( CIO_IOERR );
     }
 
+    if ( !stream.write( tempKappaRateCompression ) ) {
+        THROW_CIOERR( CIO_IOERR );
+    }
 
     if ( !stream.write( beta ) ) {
         THROW_CIOERR( CIO_IOERR );
@@ -106,7 +111,11 @@ void ConcreteDPM2RatePlasticStatus::restoreContext( DataStream &stream, ContextM
     ConcreteDPM2Status::restoreContext( stream, mode );
     contextIOResultType iores;
 
-    if ( !stream.write( KappaRate ) ) {
+    if ( !stream.write( kappaRateTension ) ) {
+        THROW_CIOERR( CIO_IOERR );
+    }
+
+    if ( !stream.write( kappaRateCompression ) ) {
         THROW_CIOERR( CIO_IOERR );
     }
 
@@ -536,8 +545,6 @@ double
 ConcreteDPM2RatePlastic::computeEquivalentStrainP( double sig, double rho, double theta, GaussPoint *gp ) const
 {
     auto status = static_cast<ConcreteDPM2RatePlasticStatus *>( this->giveStatus( gp ) );
-    // Xiaowei: This seems to be wrong! You need to calculate the equivalent strain based on ftYield and fcYield.initDamaged
-    //  This will affect fc but also m. The equivalent strain is based on the yield function.
 
     double tempKappaP = status->giveTempKappaP();
     double ftYield    = computeFtYield( tempKappaP, deltaTime, gp );
@@ -576,15 +583,6 @@ ConcreteDPM2RatePlastic::computeDamageParamTension( double equivStrain, double k
     double wfMod    = this->wf;
     double wfOneMod = this->wfOne;
 
-    //        if ( this->strengthRateType > 0 ) {
-    //            if ( this->energyRateType == 0 ) {
-    //                wfMod /= pow(rateFactor, 2.);
-    //                wfOneMod /= pow(rateFactor, 2.);
-    //            } else if ( this->energyRateType == 1 ) {
-    //                wfMod /= rateFactor;
-    //                wfOneMod /= rateFactor;
-    //            }
-    //        }
     double tempKappaP = status->giveTempKappaP();
     double ftYield    = computeFtYield( tempKappaP, deltaTime, gp );
     double e01        = ftYield / this->eM;
@@ -767,6 +765,8 @@ ConcreteDPM2RatePlastic::performPlasticityReturn( GaussPoint *gp, const FloatMat
     // get plastic strain and kappa
     auto tempPlasticStrain = status->givePlasticStrain();
     double tempKappaP      = status->giveKappaP();
+    double tempKappaRate = 0.;
+    double beta = 0.;
 
     // this theta computed here should stay constant for the rest of procedure.
     const auto &oldStrain = status->giveReducedStrain();
@@ -818,6 +818,10 @@ ConcreteDPM2RatePlastic::performPlasticityReturn( GaussPoint *gp, const FloatMat
             tempPlasticStrain = status->givePlasticStrain();
             status->letTempPlasticStrainBe( tempPlasticStrain );
             status->letTempKappaPBe( tempKappaP );
+            tempKappaRate = (tempKappaP-status->giveKappaP())/deltaTime;
+
+
+
             break;
         }
 
@@ -1167,20 +1171,12 @@ ConcreteDPM2RatePlastic::computeYieldValue( double sig,
     double yieldHardOne = computeHardeningOne( tempKappa );
     double yieldHardTwo = computeHardeningTwo( tempKappa );
 
-    // Xiaowei: Check this. Your way of calculating tempKappaRate might have caused problems. Now it uses giveKappaP() and the tempKappa that is input of the function. The same in dfDKappa.
-    //double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
-
-    //  printf("tempKappaRate = %e\n", tempKappaRate);
-
     //  compute elliptic function r
     double rFunction = ( 4. * ( 1. - pow( ecc, 2. ) ) * pow( cos( theta ), 2. ) + pow( ( 2. * ecc - 1. ), 2. ) ) / ( 2. * ( 1. - pow( ecc, 2. ) ) * cos( theta ) + ( 2. * ecc - 1. ) * sqrt( 4. * ( 1. - pow( ecc, 2. ) ) * pow( cos( theta ), 2. ) + 5. * pow( ecc, 2. ) - 4. * ecc ) );
 
-    double tempKappaP = status->giveTempKappaP();
-    double ftYield    = computeFtYield( tempKappaP, deltaTime, gp );
-    double e01        = ftYield / this->eM;
+    double ftYield    = computeFtYield( tempKappa, deltaTime, gp );
 
-    double fcYield    = computeFcYield( tempKappaP, deltaTime, gp );
-
+    double fcYield    = computeFcYield( tempKappa, deltaTime, gp );
 
 
     double myield = 3. * ( pow( fcYield, 2. ) - pow( ftYield, 2. ) ) / ( fcYield * ftYield ) * this->ecc / ( this->ecc + 1. );
@@ -1194,14 +1190,20 @@ ConcreteDPM2RatePlastic::computeYieldValue( double sig,
 }
 
 
-//    Xiaowei, you have extended computeDfDkappa to take more variables. Therefore, everywhere where computeDFDKappa is called you need to make the schange, too. For instance, computeJacobian, computeFullJacobian. In those funtions, you will need to access deltaTime.
-
-
 double ConcreteDPM2RatePlastic::computeFcYield( double tempKappa, double deltaTime, GaussPoint *gp ) const
 {
     auto status          = static_cast<ConcreteDPM2RatePlasticStatus *>( this->giveStatus( gp ) );
-    double tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
-    double fcYield       = this->fc * ( 1 + cCompression * log( 1. + tempKappaRate / kappaRate0Compression ) );
+    double tempKappaRateCompression = 0.;
+    if(tempKappa == status->giveKappaP()){
+            tempKappaRateCompression = status->giveKappaRateCompression();
+    }
+    else {
+          tempKappaRateCompression = ( tempKappa - status->giveKappaP() ) / deltaTime;
+    }
+
+    status->setTempKappaRateCompression(tempKappaRateCompression);
+
+    double fcYield       = this->fc * ( 1 + cCompression * log( 1. + tempKappaRateCompression / kappaRate0Compression ) );
     return fcYield;
 }
 
@@ -1213,47 +1215,48 @@ double ConcreteDPM2RatePlastic::computeFtYield( double tempKappa, double deltaTi
     // Rate factor in tension has to be made mesh independent once damage has started, because the model is based on the crack band approach.
     // It is assumed that damage starts once tempKappaP is greater than 1.
     double tempBeta      = 0.;
-    double tempKappaRate = 0.;
-    if ( tempKappa == status->giveKappaP() ) {
-        tempKappaRate = status->giveTempKappaRate();
-    } else if ( status->giveKappaP() <= 1. ) {
-        // Damage is zero
-        tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
-    } else {
-        // Damage in previous step is not zero
-        tempBeta = status->giveTempBeta();
-        if ( tempBeta == 0 ) {
-            // Calculate tempBeta only once
-            tempBeta = status->giveTempKappaRate() / ( status->giveLe() * ( tempKappa - status->giveKappaP() ) / deltaTime );
-            status->setTempBeta( tempBeta );
-        }
+    double tempKappaRateTension = 0.;
 
-        tempKappaRate = tempBeta * status->giveLe() * ( tempKappa - status->giveKappaP() ) / deltaTime;
+    if ( tempKappa == status->giveKappaP() ) {
+        tempKappaRateTension = status->giveKappaRateTension();
+    } else{
+        if ( status->giveKappaP() <= 1. ) {
+        // Damage is zero
+        tempKappaRateTension = ( tempKappa - status->giveKappaP() ) / deltaTime;
+        }
+        else{
+        // Damage in previous step is not zero
+            tempBeta = status->giveBeta();
+            if ( tempBeta == 0 ) {
+            // Calculate tempBeta only once
+                tempBeta = status->giveKappaRateTension() / ( status->giveLe() * ( tempKappa - status->giveKappaP() ) / deltaTime);
+            }
+            tempKappaRateTension = tempBeta* status->giveLe() *( tempKappa - status->giveKappaP() ) / deltaTime;
+        }
     }
 
+    status->setTempKappaRateTension(tempKappaRateTension);
+    status->setTempBeta(tempBeta);
 
-    // Update the status here.
-
-    status->setTempKappaRate( tempKappaRate );
-
-
-    double ftYield = this->ft * ( 1 + cTension * log( 1. + tempKappaRate / kappaRate0Tension ) );
+    double ftYield = this->ft * ( 1 + cTension * log( 1. + tempKappaRateTension / kappaRate0Tension ) );
     return ftYield;
 }
 double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double deltaTime, GaussPoint *gp ) const
 {
     auto status = static_cast < ConcreteDPM2RatePlasticStatus * > ( this->giveStatus(gp) );
 
-    double tempKappaRate = 0.;
+    double tempKappaRateCompression = 0.;
 
     if(tempKappa == status->giveKappaP()){
-        tempKappaRate = status->giveTempKappaRate();
+        tempKappaRateCompression = status->giveKappaRateCompression();
     }
     else{
         //Damage is zero
-        tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
+        tempKappaRateCompression = ( tempKappa - status->giveKappaP() ) / deltaTime;
     }
-    double dFcDKappaRate = fc * cCompression * 1. / ( tempKappaRate + kappaRate0Compression )/deltaTime;
+
+    status->setTempKappaRateCompression(tempKappaRateCompression);
+    double dFcDKappaRate = fc * cCompression * 1. / ( tempKappaRateCompression + kappaRate0Compression )/deltaTime;
 
     return dFcDKappaRate;
 
@@ -1267,42 +1270,38 @@ double ConcreteDPM2RatePlastic::computeDFcDKappa( double tempKappa, double delta
         //Rate factor in tension has to be made mesh independent once damage has started, because the model is based on the crack band approach.
         //It is assumed that damage starts once tempKappaP is greater than 1.
         double tempBeta = 0.;
-        double tempKappaRate = 0.;
+        double tempKappaRateTension = 0.;
         double dFtDKappa = 0.;
         if(tempKappa == status->giveKappaP()){
-            tempKappaRate = status->giveTempKappaRate();
-            dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime;
-
+            tempKappaRateTension = status->giveKappaRateTension();
+            dFtDKappa = this->ft * cTension * 1. / ( tempKappaRateTension + kappaRate0Tension )/deltaTime;
         }
         else if(status->giveKappaP() <= 1.){
             //Damage is zero
-            tempKappaRate = ( tempKappa - status->giveKappaP() ) / deltaTime;
-           dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime;
+            tempKappaRateTension = ( tempKappa - status->giveKappaP() ) / deltaTime;
+           dFtDKappa = this->ft * cTension * 1. / ( tempKappaRateTension + kappaRate0Tension )/deltaTime;
 
         }
         else{
             //Damage in previous step is not zero
-            tempBeta = status->giveTempBeta();
+            tempBeta = status->giveBeta();
             if(tempBeta == 0){
                 //Calculate tempBeta only once
-                tempBeta = status->giveTempKappaRate()/(status->giveLe()*
+                tempBeta = status->giveTempKappaRateTension()/(status->giveLe()*
                                ( tempKappa - status->giveKappaP() ) / deltaTime);
-                status->setTempBeta(tempBeta);
             }
 
-            tempKappaRate = tempBeta*status->giveLe()*
+            tempKappaRateTension = tempBeta*status->giveLe()*
                 ( tempKappa - status->giveKappaP() ) / deltaTime;
 
-           dFtDKappa = this->ft * cTension * 1. / ( tempKappaRate + kappaRate0Tension )/deltaTime *tempBeta*status->giveLe();
+           dFtDKappa = this->ft * cTension * 1. / ( tempKappaRateTension + kappaRate0Tension )/deltaTime *tempBeta*status->giveLe();
 
         }
 
-
         //Update the status here.
 
-        status->setTempKappaRate(tempKappaRate);
-
-
+        status->setTempKappaRateTension(tempKappaRateTension);
+        status->setTempBeta(tempBeta);
 
         return dFtDKappa;
 
