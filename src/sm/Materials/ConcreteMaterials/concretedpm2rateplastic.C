@@ -765,8 +765,6 @@ ConcreteDPM2RatePlastic::performPlasticityReturn( GaussPoint *gp, const FloatMat
     // get plastic strain and kappa
     auto tempPlasticStrain = status->givePlasticStrain();
     double tempKappaP      = status->giveKappaP();
-    double tempKappaRate = 0.;
-    double beta = 0.;
 
     // this theta computed here should stay constant for the rest of procedure.
     const auto &oldStrain = status->giveReducedStrain();
@@ -818,10 +816,6 @@ ConcreteDPM2RatePlastic::performPlasticityReturn( GaussPoint *gp, const FloatMat
             tempPlasticStrain = status->givePlasticStrain();
             status->letTempPlasticStrainBe( tempPlasticStrain );
             status->letTempKappaPBe( tempKappaP );
-            tempKappaRate = (tempKappaP-status->giveKappaP())/deltaTime;
-
-
-
             break;
         }
 
