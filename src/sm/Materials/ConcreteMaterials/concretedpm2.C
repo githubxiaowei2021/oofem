@@ -219,7 +219,6 @@ namespace oofem {
 
         fprintf(file, " rateFactor %.10e,", this->rateFactor);
 
-        fprintf(file, " rateFactor %.10e,", this->rateFactor);
 
 #ifdef keep_track_of_dissipated_energy
         fprintf(file, " dissW %g, freeE %g, stressW %g ", this->dissWork, ( this->stressWork ) - ( this->dissWork ), this->stressWork);
@@ -592,11 +591,9 @@ namespace oofem {
         }
 
         this->deltaTime = -1.;
+        IR_GIVE_OPTIONAL_FIELD(ir, this->deltaTime, _IFT_ConcreteDPM2_deltatime);
         this->energyRateType = 0;
-        if ( this->strengthRateType > 0 ) {
-            IR_GIVE_OPTIONAL_FIELD(ir, this->deltaTime, _IFT_ConcreteDPM2_deltatime);
-            IR_GIVE_OPTIONAL_FIELD(ir, this->energyRateType, _IFT_ConcreteDPM2_energyratetype);
-        }
+        IR_GIVE_OPTIONAL_FIELD(ir, this->energyRateType, _IFT_ConcreteDPM2_energyratetype);
     }
 
 
@@ -1136,7 +1133,7 @@ namespace oofem {
 
         //Determine the principal values of the strain
 
-        auto principalStrain = StructuralMaterial::computePrincipalValues( from_voigt_strain(strain) );  ///@todo CHECK
+        auto principalStrain = StructuralMaterial::computePrincipalValues( from_voigt_strain(strain) );   ///@todo CHECK
 
         //Determine max and min value;
         double maxStrain = -1.e20, minStrain = 1.e20;

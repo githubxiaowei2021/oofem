@@ -82,13 +82,13 @@ public:
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
 
-    double giveKappaRateTension() const { return kappaRateTension;}
-    double giveKappaRateCompression() const { return kappaRateCompression;}
-    double giveBeta() const { return beta;}
+    double giveKappaRateTension() const { return kappaRateTension; }
+    double giveKappaRateCompression() const { return kappaRateCompression; }
+    double giveBeta() const { return beta; }
 
-    double giveTempKappaRateTension() const { return tempKappaRateTension;}
-    double giveTempKappaRateCompression() const { return tempKappaRateCompression;}
-    double giveTempBeta() const { return tempBeta;}
+    double giveTempKappaRateTension() const { return tempKappaRateTension; }
+    double giveTempKappaRateCompression() const { return tempKappaRateCompression; }
+    double giveTempBeta() const { return tempBeta; }
 
     void setTempKappaRateTension(double newKappaRate) { tempKappaRateTension = newKappaRate; }
     void setTempKappaRateCompression(double newKappaRate) { tempKappaRateCompression = newKappaRate; }
@@ -123,48 +123,48 @@ public:
 
     const char *giveClassName() const override { return "ConcreteDPM2RatePlastic"; }
 
-    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, double deltaTime, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const override;
+    FloatArrayF< 2 >computeDamage(const FloatArrayF< 6 > &strain, const FloatMatrixF< 6, 6 > &D, const double dt, GaussPoint *gp, TimeStep *tStep, double tempAlpha, const FloatArrayF< 6 > &effectiveStress) const override;
 
-   // double computeRateFactor(double alpha) const;
+    // double computeRateFactor(double alpha) const;
 
-    double computeDeltaPlasticStrainNormTensionP(double tempKappaD, double kappaD, GaussPoint *gp) const;
+    double computeDeltaPlasticStrainNormTensionP(double tempKappaD, double kappaD, double dt, GaussPoint *gp) const;
 
-    double computeDeltaPlasticStrainNormCompressionP(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const;
+    double computeDeltaPlasticStrainNormCompressionP(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho, double dt) const;
 
-    int checkForUnAndReloadingP(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF< 6, 6 > &D, GaussPoint *gp) const;
+    int checkForUnAndReloadingP(double &tempEquivStrain, double &minEquivStrain, const FloatMatrixF< 6, 6 > &D, const double dt, GaussPoint *gp) const;
 
-    double computeEquivalentStrainP(double sig, double rho, double theta, GaussPoint *gp) const;
+    double computeEquivalentStrainP(double sig, double rho, double theta, const double dt, GaussPoint *gp) const;
 
-    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, GaussPoint *gp) const;
-    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, GaussPoint *gp) const;
+    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, const double dt, GaussPoint *gp) const;
+    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, const double dt, GaussPoint *gp) const;
 
-    void initDamagedP(double kappaD, const FloatArrayF< 6 > &strain, GaussPoint *gp) const;
+    void initDamagedP(double kappaD, const FloatArrayF< 6 > &strain, const double dt, GaussPoint *gp) const;
 
-    FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double deltaTime) const;
+    FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double dt) const;
 
-    double performRegularReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double kappaP, GaussPoint *gp, double theta, const double deltaTime) const;
+    double performRegularReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double kappaP, GaussPoint *gp, double theta, const double dt) const;
 
-    double performVertexReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double apexStress, double tempKappaP, GaussPoint *gp, const double deltaTime) const;
+    double performVertexReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double apexStress, double tempKappaP, GaussPoint *gp, const double dt) const;
 
-    double computeFcYield(double tempKappa, double deltaTime, GaussPoint *gp) const;
-    double computeFtYield(double tempKappa, double deltaTime, GaussPoint *gp) const;
+    double computeFcYield(double tempKappa, const double dt, GaussPoint *gp) const;
+    double computeFtYield(double tempKappa, const double dt, GaussPoint *gp) const;
 
-    double computeDFtDKappa(double tempKappa, double deltaTime, GaussPoint *gp) const;
+    double computeDFtDKappa(double tempKappa, const double dt, GaussPoint *gp) const;
 
-    double computeDFcDKappa(double tempKappa, double deltaTime, GaussPoint *gp) const;
+    double computeDFcDKappa(double tempKappa, const double dt, GaussPoint *gp) const;
 
-    FloatMatrixF< 4, 4 >computeJacobian(double sig, double rho, double theta, double kappa, double deltaLambda, GaussPoint *gp, const double deltaTime) const;
+    FloatMatrixF< 4, 4 >computeJacobian(double sig, double rho, double theta, double kappa, double deltaLambda, GaussPoint *gp, const double dt) const;
 
-    double computeYieldValue(double sig, double rho, double theta, double tempKappa, const double deltaTime, GaussPoint *gp) const;
+    double computeYieldValue(double sig, double rho, double theta, double tempKappa, const double dt, GaussPoint *gp) const;
 
 
-    double computeDFDKappa(double sig, double rho, double theta, double tempKappa, double deltaTime, GaussPoint *gp) const;
+    double computeDFDKappa(double sig, double rho, double theta, double tempKappa, const double dt, GaussPoint *gp) const;
 
-    FloatArrayF < 2 >computeDFDInv(double sig, double rho, double theta, double tempKappa, GaussPoint * gp) const;
+    FloatArrayF< 2 >computeDFDInv(double sig, double rho, double theta, double tempKappa, const double dt, GaussPoint *gp) const;
 
-    FloatArrayF < 6 >computeDFDStress(const FloatArrayF < 6 > & stress, double tempKappa, GaussPoint * gp) const;
+    FloatArrayF< 6 >computeDFDStress(const FloatArrayF< 6 > &stress, double tempKappa, const double dt, GaussPoint *gp) const;
 
-    FloatMatrixF< 8, 8 >computeFullJacobian(const FloatArrayF< 6 > &stress, const double deltaLambda, GaussPoint *gp, TimeStep *atTime, const double tempKappa, const double deltaTime) const;
+    FloatMatrixF< 8, 8 >computeFullJacobian(const FloatArrayF< 6 > &stress, const double deltaLambda, GaussPoint *gp, TimeStep *atTime, const double tempKappa, const double dt) const;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 
