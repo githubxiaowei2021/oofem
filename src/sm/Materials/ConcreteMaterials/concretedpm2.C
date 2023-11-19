@@ -1231,7 +1231,7 @@ namespace oofem {
         } else {
             deltaPlasticStrainNorm = norm(deltaPlasticStrain);
         }
-
+        //printf("delataplasticstrain = %e\n", deltaPlasticStrainNorm);
         return deltaPlasticStrainNorm;
     }
 
@@ -1871,7 +1871,7 @@ namespace oofem {
 
             normOfResiduals = norm(residualsNorm);
 
-            printf("normOfResiduals = %e\n", normOfResiduals);
+            //printf("normOfResiduals = %e\n", normOfResiduals);
 
             if ( std::isnan(normOfResiduals) ) {
                 returnResult = RR_NotConverged;
@@ -2869,7 +2869,7 @@ namespace oofem {
         double a2theta = 8. * ( 1. - pow(ecc, 2.) );
         double Ntheta = 4. * ( 1. - ecc * ecc ) * cos(theta) * cos(theta) +
                         5. * ecc * ecc - 4. * ecc;
-        printf("cos(theta) = %e\n", cos(theta) );
+        //printf("cos(theta) = %e\n", cos(theta) );
         double b2theta =  4. * ( 2. * ecc - 1. ) * ( 1. - ecc * ecc ) / sqrt(Ntheta) *
                          ( 1. - 4. * ( 1. - ecc * ecc ) * cos(theta) * cos(theta) / Ntheta );
         double ddrddcostheta = a2theta / btheta - 2. * a1theta * b1theta / ( btheta * btheta ) -
