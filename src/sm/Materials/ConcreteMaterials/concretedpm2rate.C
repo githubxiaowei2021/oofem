@@ -500,7 +500,7 @@ ConcreteDPM2Rate::computeRateFactorTension(double strainRate,
     
     if (strainRate >this->atOne && strainRate < this->atTwo ) {
       rateFactorTension = pow(strainRateRatioTension, this->atThree);
-    } else {
+    }else if (strainRate >= this->atTwo){
       rateFactorTension =  this->atFour * pow(strainRateRatioTension, this->atFive);
     }
     
@@ -518,7 +518,7 @@ ConcreteDPM2Rate::computeRateFactorCompression(double strainRate,
     double strainRateRatioCompression = strainRate / this->acOne ;
     if ( this->acOne < strainRate && strainRate < this->acTwo ) {
       rateFactorCompression = pow(strainRateRatioCompression, this->acThree);
-    } else if ( this->acTwo < strainRate ) {
+    } else if ( this->acTwo <= strainRate ) {
       rateFactorCompression =  this->acFour * pow(strainRateRatioCompression, this->acFive);
     }    
 
