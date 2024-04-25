@@ -77,20 +77,25 @@ class ConcreteDPM2PlasticRate1Status : public ConcreteDPM2Status
 {
 protected:
 
-    double RateTension = 0.;
-    double tempRateTension = 0.;
-    double RateCompression = 0.;
-    double tempRateCompression = 0.;
+    double strainRateTension = 0.;
+    double tempStrainRateTension = 0.;
+    double strainRateCompression = 0.;
+    double tempStrainRateCompression = 0.;
+
+    double rateStrainTension = 0.;
+    double tempRateStrainTension = 0.;
+
+    double rateStrainCompression = 0.;
+    double tempRateStrainCompression = 0.;
 
     double beta = 0.;
     double tempBeta = 0.;
 
-    double rateFactorTension = 0.;
-    double tempRateFactorTension = 0.;
+    double rateFactorTension = 1.;
+    double tempRateFactorTension = 1.;
 
-    double rateFactorCompression = 0.;
-    double tempRateFactorCompression = 0.;
-
+    double rateFactorCompression = 1.;
+    double tempRateFactorCompression = 1.;
 
 public:
     /// Constructor
@@ -102,25 +107,26 @@ public:
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
 
-    double giveRateTension() const { return RateTension; }
-    double giveRateCompression() const { return RateCompression; }
+
+    double giveStrainRateTension() const { return strainRateTension; }
+    double giveStrainRateCompression() const { return strainRateCompression; }
     double giveBeta() const { return beta; }
     double giveRateFactorTension() const {return rateFactorTension;}
     double giveRateFactorCompression() const {return rateFactorCompression;}
-
-
-    double giveTempRateTension() const { return tempRateTension; }
-    double giveTempRateCompression() const { return tempRateCompression; }
     double giveTempBeta() const { return tempBeta; }
-    double giveTempRateFactorTension() const { return tempRateFactorTension;}
-    double giveTempRateFactorCompression() const { return tempRateFactorCompression;}
+    double giveRateStrainTension() const {return rateStrainTension;}
+    double giveRateStrainCompression() const {return rateStrainCompression;}
 
 
-    void setTempRateTension(double newRate) { tempRateTension = newRate; }
-    void setTempRateCompression(double newRate) { tempRateCompression = newRate; }
+
+    void letTempStrainRateTensionBe(double newRate) { tempStrainRateTension = newRate; }
+    void letTempStrainRateCompressionBe(double newRate) { tempStrainRateCompression = newRate; }
     void setTempBeta(double newBeta) { tempBeta = newBeta; }
     void setTempRateFactorTension(double newRateFactor) { tempRateFactorTension = newRateFactor; }
     void setTempRateFactorCompression(double newRateFactor) { tempRateFactorCompression = newRateFactor; }
+    void setTempRateStrainTension(double newRateStrain) { tempRateStrainTension = newRateStrain;}
+    void setTempRateStrainCompression(double newRateStrain) { tempRateStrainCompression = newRateStrain;}
+
 
 
     const char *giveClassName() const override { return "ConcreteDPM2PlasticRate1Status"; }
@@ -163,11 +169,6 @@ class ConcreteDPM2PlasticRate1 : public ConcreteDPM2
 
     double computeYieldValue(double sig, double rho, double theta, double tempKappa, const double dt, GaussPoint *gp) const;
 
-    double computeFcYield( const double dt, GaussPoint *gp) const;
-    double computeFtYield( const double dt, GaussPoint *gp) const;
-    double computeRateFactorCompression(GaussPoint *gp,const double dt) const;
-    double computeRateFactorTension(GaussPoint *gp, const double dt) const;
-
     FloatArrayF< 6 >performPlasticityReturn(GaussPoint *gp, const FloatMatrixF< 6, 6 > &D, const FloatArrayF< 6 > &strain, const double dt) const;
 
     double performVertexReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double apexStress, double tempKappaP, GaussPoint *gp, const double dt) const;
@@ -175,6 +176,17 @@ class ConcreteDPM2PlasticRate1 : public ConcreteDPM2
     double performRegularReturn(FloatArrayF< 6 > &effectiveStress, ConcreteDPM2_ReturnResult &returnResult, ConcreteDPM2_ReturnType &returnType, double kappaP, GaussPoint *gp, double theta, const double dt) const;
 
     FloatArrayF< 6 >giveRealStressVector_3d(const FloatArrayF< 6 > &strain, GaussPoint *gp, TimeStep *tStep) const override;
+
+    /// Compute damage parameter in tension.
+    double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, GaussPoint *gp) const;
+
+    /// Compute damage parameter in compression.
+    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, GaussPoint *gp) const;
+
+    /**
+     * This function computes the rate factor which is used to take into account the strain rate dependence of the material.
+     */
+    void computeRateFactor(double alpha, double timeFactor, GaussPoint *gp, TimeStep *deltaTime) const;
 
     FloatArrayF< 2 >computeDFDInv(double sig, double rho, double theta, double tempKappa, const double dt, GaussPoint *gp) const;
     double computeEquivalentStrainP(double sig, double rho, double theta, const double dt, GaussPoint *gp) const;
@@ -187,6 +199,8 @@ class ConcreteDPM2PlasticRate1 : public ConcreteDPM2
     FloatArrayF< 6 >computeDFDStress(const FloatArrayF< 6 > &stress, double tempKappa, const double dt, GaussPoint *gp) const;
     FloatMatrixF< 8, 8 >computeFullJacobian(const FloatArrayF< 6 > &stress, const double deltaLambda, GaussPoint *gp, TimeStep *atTime, const double tempKappa, const double dt) const;
     FloatMatrixF < 6, 6 >compute3dTangentStiffness(GaussPoint * gp, TimeStep * tStep, const double dt) const;
+
+    void initDamaged(double kappa, const FloatArrayF< 6 > &strain, GaussPoint *gp) const override;
 
     double computeDuctilityMeasure(double sig,double rho,double theta,GaussPoint *gp,const double dt) const;
     double computeTempKappa(double kappaInitial,double sigTrial,double rhoTrial,double sig,GaussPoint *gp,const double dt) const;

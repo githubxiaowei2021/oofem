@@ -219,8 +219,6 @@ namespace oofem {
 
         fprintf(file, " rateFactor %.10e,", this->rateFactor);
 
-        fprintf(file, " rateFactor %.10e,", this->rateFactor);
-
 #ifdef keep_track_of_dissipated_energy
         fprintf(file, " dissW %g, freeE %g, stressW %g ", this->dissWork, ( this->stressWork ) - ( this->dissWork ), this->stressWork);
 #endif

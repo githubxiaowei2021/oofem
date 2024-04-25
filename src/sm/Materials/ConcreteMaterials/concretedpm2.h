@@ -947,7 +947,7 @@ public:
     /**
      * This function computes the rate factor which is used to take into account the strain rate dependence of the material.
      */
-    double computeRateFactor(double alpha,
+     double computeRateFactor(double alpha,
                              double timeFactor,
                              GaussPoint *gp,
                              TimeStep *deltaTime) const;
@@ -1074,7 +1074,7 @@ public:
     double computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld, double rateFactor) const;
 
     /// Compute damage parameter in compression.
-    double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor) const;
+   double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, double rateFactor) const;
 
     /// Compute equivalent strain value for tension.
     double computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const;
@@ -1092,7 +1092,7 @@ public:
      * Initialize the characteristic length, if damage is not yet activated
      * Set the increase factor for the strain rate dependence
      */
-    void initDamaged(double kappa,
+    virtual void initDamaged(double kappa,
                      const FloatArrayF< 6 > &strain,
                      GaussPoint *gp) const;
 
