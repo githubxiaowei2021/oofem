@@ -1115,6 +1115,69 @@ ConcreteDPM2PlasticRate1::computeDamage(const FloatArrayF < 6 > & strain,
                            };
 }
 
+double
+ConcreteDPM2PlasticRate1::computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const
+{
+    auto status = static_cast < ConcreteDPM2Status * > ( this->giveStatus(gp) );
+
+    const auto &tempPlasticStrain = status->giveTempPlasticStrain();
+    const auto &plasticStrain = status->givePlasticStrain();
+
+    auto deltaPlasticStrain = tempPlasticStrain - plasticStrain;
+
+    double deltaPlasticStrainNorm = 0;
+
+    //Distinguish pre-peak, peak and post-peak
+
+    double factor = 0.;
+    if ( tempKappaD < e0 * ( 1. - yieldTolDamage ) * status->giveRateFactor() ) {
+        deltaPlasticStrainNorm = 0.;
+    } else if ( tempKappaD > e0 * ( 1. - yieldTolDamage ) * status->giveRateFactor() && kappaD < e0  * ( 1. - yieldTolDamage ) * status->giveRateFactor()) {
+        factor = ( 1. - ( e0 * status->giveRateFactor() - kappaD ) / ( tempKappaD - kappaD ) );
+        deltaPlasticStrain *= factor;
+        deltaPlasticStrainNorm = norm(deltaPlasticStrain);
+    } else {
+        deltaPlasticStrainNorm = norm(deltaPlasticStrain);
+    }
+
+    return deltaPlasticStrainNorm;
+}
+
+
+double
+ConcreteDPM2PlasticRate1::computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const
+{
+    auto status = static_cast < ConcreteDPM2Status * > ( this->giveStatus(gp) );
+
+    const auto &tempPlasticStrain = status->giveTempPlasticStrain();
+    const auto &plasticStrain = status->givePlasticStrain();
+
+    auto deltaPlasticStrain = tempAlpha * ( tempPlasticStrain - plasticStrain );
+
+    double deltaPlasticStrainNorm = 0;
+
+    //Distinguish pre-peak, peak and post-peak
+    if ( tempKappaD < e0 * ( 1. - yieldTolDamage ) * status->giveRateFactor() ) {
+        deltaPlasticStrainNorm = 0.;
+    } else if ( tempKappaD > e0 * ( 1. - yieldTolDamage ) * status->giveRateFactor() && kappaD < e0 * ( 1. - yieldTolDamage )*status->giveRateFactor() ) {
+        double factor = ( 1. - ( e0 * status->giveRateFactor() - kappaD ) / ( tempKappaD - kappaD ) );
+        deltaPlasticStrain *= factor;
+        deltaPlasticStrainNorm = norm(deltaPlasticStrain);
+    } else {
+        deltaPlasticStrainNorm = norm(deltaPlasticStrain);
+    }
+
+    double tempKappaP = status->giveTempKappaP();
+    double yieldHardTwo = computeHardeningTwo(tempKappaP);
+    double extraFactor;
+    if ( rho < 1.e-16 ) {
+        extraFactor = this->ft * status->giveRateFactor() * yieldHardTwo * sqrt(2. / 3.) / 1.e-16 / sqrt( 1. + 2. * pow(this->dilationConst, 2.) );
+    } else {
+        extraFactor = this->ft * status->giveRateFactor() * yieldHardTwo * sqrt(2. / 3.) / rho / sqrt( 1. + 2. * pow(this->dilationConst, 2.) );
+    }
+
+    return deltaPlasticStrainNorm * extraFactor;
+}
 
 double
 ConcreteDPM2PlasticRate1::computeDamageParamTension(double equivStrain, double kappaOne, double kappaTwo, double le, double omegaOld,GaussPoint *gp) const
@@ -1126,6 +1189,7 @@ ConcreteDPM2PlasticRate1::computeDamageParamTension(double equivStrain, double k
     //So that damage does not turn out to be negative if function is entered for equivstrains smaller thatn e0.
   double rateFactor = status->giveRateFactor();
     double ftTemp = this->ft * ( 1. - yieldTolDamage ) * rateFactor;
+    double ftOneTemp = this->ft * ( 1. - yieldTolDamage ) * rateFactor;
 
     double wfMod = this->wf;
     double wfOneMod = this->wfOne;
@@ -1141,17 +1205,17 @@ ConcreteDPM2PlasticRate1::computeDamageParamTension(double equivStrain, double k
             omega = ( this->eM * equivStrain * wfMod - ftTemp * wfMod + ftTemp * kappaOne * le ) /
                 ( this->eM * equivStrain * wfMod - ftTemp * le * kappaTwo );
         } else if ( softeningType == 1 ) { //bilinear: Calculate damage parameter for both parts of bilinear curve  and check which fulfils limits.
-            omega = ( this->eM * equivStrain * wfOneMod - ftTemp * wfOneMod - ( this->ftOne - ftTemp ) * kappaOne * le ) /
-                ( this->eM * equivStrain * wfOneMod + ( this->ftOne - ftTemp ) * le * kappaTwo );
+            omega = ( this->eM * equivStrain * wfOneMod - ftTemp * wfOneMod - ( ftOneTemp - ftTemp ) * kappaOne * le ) /
+                ( this->eM * equivStrain * wfOneMod + ( ftOneTemp - ftTemp ) * le * kappaTwo );
             help = le * kappaOne + le * omega * kappaTwo;
 
             if ( help >= 0. && help < wfOneMod ) {
                 return omega;
             }
 
-            omega = ( this->eM * equivStrain * ( wfMod - wfOneMod ) - this->ftOne * ( wfMod - wfOneMod ) +
-                        this->ftOne * kappaOne * le  - this->ftOne * wfOneMod ) /
-                ( this->eM * equivStrain * ( wfMod - wfOneMod )  - this->ftOne * le * kappaTwo );
+            omega = ( this->eM * equivStrain * ( wfMod - wfOneMod ) - ftOneTemp * ( wfMod - wfOneMod ) +
+                        ftOneTemp * kappaOne * le  - ftOneTemp * wfOneMod ) /
+                ( this->eM * equivStrain * ( wfMod - wfOneMod )  - ftOneTemp * le * kappaTwo );
             help = le * kappaOne + le * omega * kappaTwo;
 
             if ( help > wfOneMod && help < wfMod ) {
