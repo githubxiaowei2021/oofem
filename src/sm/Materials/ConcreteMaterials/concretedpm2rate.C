@@ -71,7 +71,12 @@ ConcreteDPM2RateStatus::initTempStatus()
     this->tempStrainRateTension = this->strainRateTension;
     this->tempStrainRateCompression = this->strainRateCompression;
     this->tempRateFactorTension = this->rateFactorTension;
-    this->tempRateFactorCompression = this->rateFactorCompression;    
+    this->tempRateFactorCompression = this->rateFactorCompression;
+
+    this->tempRateStrainTension = this->rateStrainTension;
+    this->tempRateStrainCompression = this->rateStrainCompression;
+
+
 }
 
 
@@ -93,6 +98,9 @@ ConcreteDPM2RateStatus::updateYourself(TimeStep *tStep)
     this->strainRateCompression = this->tempStrainRateCompression;
     this->rateFactorTension = this->tempRateFactorTension;
     this->rateFactorCompression = this->tempRateFactorCompression;
+
+    this->rateStrainTension = this->tempRateStrainTension;
+    this->rateStrainCompression = this->tempRateStrainCompression;
 }
 
 
@@ -128,6 +136,14 @@ ConcreteDPM2RateStatus::saveContext(DataStream &stream, ContextMode mode)
     if ( !stream.write(rateFactorCompression) ) {
       THROW_CIOERR(CIO_IOERR);
     }
+
+    if ( !stream.write(rateStrainTension) ) {
+      THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.write(rateStrainCompression) ) {
+      THROW_CIOERR(CIO_IOERR);
+    }
 }
 
 void
@@ -160,7 +176,14 @@ ConcreteDPM2RateStatus::restoreContext(DataStream &stream, ContextMode mode)
     if ( !stream.read(rateFactorCompression) ) {
         THROW_CIOERR(CIO_IOERR);
     }
-  
+
+    if ( !stream.read(rateStrainTension) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
+
+    if ( !stream.read(rateStrainCompression) ) {
+        THROW_CIOERR(CIO_IOERR);
+    }
 }
   
   //***************************
@@ -233,16 +256,52 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
 
     FloatArrayF<2> tempRateFactor;
 
+
+/*
+    auto principalStrain = StructuralMaterial::computePrincipalValues( from_voigt_strain(strain) );  ///@todo CHECK
+
+    //Determine max and min value;
+    double maxStrain = -1.e20, minStrain = 1.e20;
+    for ( int k = 1; k <= principalStrain.giveSize(); k++ ) {
+        //maximum
+        if ( principalStrain.at(k) > maxStrain ) {
+            maxStrain = principalStrain.at(k);
+        }
+
+        //minimum
+        if ( principalStrain.at(k) < minStrain ) {
+            minStrain = principalStrain.at(k);
+        }
+    }
+
+    double strainRateTension;
+    double strainRateCompression;
+    double oldRateStrainCompression = status->giveRateStrainCompression();
+    double oldRateStrainTension = status->giveRateStrainTension();
+
+
+
+
+
     //For tempStrainRateCompression should this be (tempEquivStrain - minEquivStrain)?
-    double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft;
+    //double tempStrainRateCompression = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime * this->fc / this->ft;
+    double tempStrainRateCompression =  -( minStrain - oldRateStrainCompression )/ deltaTime * this->fc / this->ft;
+
+    status->setTempStrainRateCompression(minStrain);
+
     double tempRateFactorCompression = computeRateFactorCompression(tempStrainRateCompression, gp, tStep);
 
     //Rate factor in tension has to be made mesh independent once damage has started, because the model is based on the crack band approach
+
+
     double tempStrainRateTension = 0.,tempRateFactorTension=1., tempBeta = 0.;
-    if(status->giveTempDamageTension() == 0){
+
+
+     if(status->giveTempDamageTension() == 0){
       //Damage is zero
-      tempStrainRateTension = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
-      tempRateFactorTension = computeRateFactorTension(tempStrainRateTension,gp, tStep);
+     //tempStrainRateTension = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
+        tempStrainRateTension = ( maxStrain - oldRateStrainTension )  / deltaTime;
+      tempRateFactorTension = computeRateFactorTension(strainRateTension,gp, tStep);
     }
     else{
       //Damage in previous step is not zero
@@ -250,32 +309,50 @@ ConcreteDPM2Rate::computeDamage(const FloatArrayF< 6 > &strain,
       if(tempBeta == 0){
 	//Calculate tempBeta only once 
 	tempBeta = status->giveStrainRateTension()/(status->giveLe()*
-						    ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime);
+						    ( maxStrain - oldRateStrainTension ) / deltaTime);
+                                                      //( tempEquivStrain - status->giveEquivStrain() ) / deltaTime);
       }
       
       tempStrainRateTension = tempBeta*status->giveLe()*
-	( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
+                                             //( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
+                                             ( maxStrain - oldRateStrainTension )/ deltaTime;
       
-      tempRateFactorTension = computeRateFactorTension(tempStrainRateTension, gp, tStep);	  
+      tempRateFactorTension = computeRateFactorTension(strainRateTension, gp, tStep);
     }
 
+
+*/
+    double strainRateTension;
+    double strainRateCompression;
+    //double tempRateFactorCompression = computeRateFactorCompression(strainRateCompression, gp, tStep);
+    //double tempRateFactorTension = computeRateFactorTension(strainRateTension, gp, tStep);
+    double tempRateFactorCompression = computeRateFactorCompression(deltaTime, gp, tStep);
+    double tempRateFactorTension = computeRateFactorTension(deltaTime, gp, tStep);
+    status->setTempRateFactorTension(tempRateFactorTension);
+    status->setTempRateFactorCompression(tempRateFactorCompression);
+
+    /*
+    status->setTempRateStrainTension(maxStrain);
     //Update the status here.
     status->setTempStrainRateTension(tempStrainRateTension);
     status->setTempRateFactorTension(tempRateFactorTension);
     status->setTempBeta(tempBeta);
     status->setTempStrainRateCompression(tempStrainRateCompression);
     status->setTempRateFactorCompression(tempRateFactorCompression);
-   
+   */
     //Compute equivalent strains for  tension and compression
     double tempEquivStrainTension = 0.;
     double tempEquivStrainCompression = 0.;
 
-    tempEquivStrainTension = status->giveEquivStrainTension() + ( tempEquivStrain - status->giveEquivStrain() ) / tempRateFactorTension;
+    tempEquivStrainTension = status->giveEquivStrainTension() + (tempEquivStrain - status->giveEquivStrain()) / tempRateFactorTension;
+    //tempEquivStrainTension = status->giveEquivStrainTension() + ( maxStrain - oldRateStrainTension ) / tempRateFactorTension;
 
     if ( unAndReloadingFlag == 0 ) { //Standard way
-      tempEquivStrainCompression = status->giveEquivStrainCompression() + ( tempAlpha * ( tempEquivStrain - status->giveEquivStrain() ) ) / tempRateFactorCompression;
+      tempEquivStrainCompression = status->giveEquivStrainCompression() + ( tempAlpha * (  tempEquivStrain - status->giveEquivStrain() ) ) / tempRateFactorCompression;
+      //tempEquivStrainCompression = status->giveEquivStrainCompression() + ( -tempAlpha * ( minStrain - oldRateStrainCompression ) ) / tempRateFactorCompression;
     } else {
-      tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * ( minEquivStrain - status->giveEquivStrain() ) / tempRateFactorCompression + ( tempAlpha * ( tempEquivStrain - minEquivStrain ) ) / tempRateFactorCompression;
+      tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * (tempEquivStrain - status->giveEquivStrain() ) / tempRateFactorCompression + ( tempAlpha * ( tempEquivStrain - minEquivStrain ) ) / tempRateFactorCompression;
+      //tempEquivStrainCompression = status->giveEquivStrainCompression() + status->giveAlpha() * (-( minStrain - oldRateStrainCompression )) / tempRateFactorCompression + ( tempAlpha * ( -( minStrain - oldRateStrainCompression )) ) / tempRateFactorCompression;
     }
 
     double fTension = tempEquivStrainTension - status->giveKappaDTension();
@@ -489,36 +566,159 @@ ConcreteDPM2Rate::computeDamageParamCompression(double equivStrain, double kappa
 }
 
 double
-ConcreteDPM2Rate::computeRateFactorTension(double strainRate,
+ConcreteDPM2Rate::computeRateFactorTension(double deltaTime,
 					   GaussPoint *gp,
 					   TimeStep *tStep) const
 {
 
     //For tension according to Model Code 2010
+    auto status = static_cast < ConcreteDPM2RateStatus * > ( this->giveStatus(gp) );
+
+    const auto &strain = status->giveTempReducedStrain();
+
+    //Determine the principal values of the strain
+
+    auto principalStrain = StructuralMaterial::computePrincipalValues( from_voigt_strain(strain) );  ///@todo CHECK
+
+    //Determine max and min value;
+    double maxStrain = -1.e20, minStrain = 1.e20;
+    for ( int k = 1; k <= principalStrain.giveSize(); k++ ) {
+        //maximum
+        if ( principalStrain.at(k) > maxStrain ) {
+            maxStrain = principalStrain.at(k);
+        }
+
+        //minimum
+        if ( principalStrain.at(k) < minStrain ) {
+            minStrain = principalStrain.at(k);
+        }
+    }
+
+    //Evaluate the equivalent strains
+    double strainRateTension;
+
+    double oldRateStrainTension = status->giveRateStrainTension();
+
+    double  tempBeta = 0.;
+
+    if(status->giveTempDamageTension()==0){
+        //Damage is zero
+        //tempStrainRateTension = ( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
+        strainRateTension = ( maxStrain - oldRateStrainTension )  / deltaTime;
+    }
+    else{
+        //Damage in previous step is not zero
+        tempBeta = status->giveTempBeta();
+        if(tempBeta == 0){
+            //Calculate tempBeta only once
+            tempBeta = status->giveStrainRateTension()/(status->giveLe()*
+                           ( maxStrain - oldRateStrainTension ) / deltaTime);
+            //( tempEquivStrain - status->giveEquivStrain() ) / deltaTime);
+        }
+
+        strainRateTension = tempBeta*status->giveLe()*
+            //( tempEquivStrain - status->giveEquivStrain() ) / deltaTime;
+            ( maxStrain - oldRateStrainTension )/ deltaTime;
+
+    }
+
+    status->setTempBeta(tempBeta);
+
+
+
+
+
+
+
+
+    //if ( 1. - alpha > CDPM2_TOL ) { //Tension
+
+    //Tension
+    //        if(status->giveTempDamageTension()<yieldTolDamage) {
+    //strainRateTension = ( maxStrain - oldRateStrainTension ) / deltaTime;
+    //        }else{ Needs to involve beta to get it right
+    //            strainRateTension = ( maxStrain - oldRateStrainTension )*status->giveLe()/ deltaTime;
+    //        }
+    status->setTempRateStrainTension(maxStrain);
+
+
+
+
     double rateFactorTension = 1.;
-    double strainRateRatioTension = strainRate / this->atOne;
+    double strainRateRatioTension = strainRateTension / this->atOne;
     
-    if (strainRate >this->atOne && strainRate < this->atTwo ) {
+    if (strainRateTension >this->atOne && strainRateTension < this->atTwo ) {
       rateFactorTension = pow(strainRateRatioTension, this->atThree);
-    }else if (strainRate >= this->atTwo){
+    }else if (strainRateTension >= this->atTwo){
       rateFactorTension =  this->atFour * pow(strainRateRatioTension, this->atFive);
     }
-    
+
+
+
     return rateFactorTension;
 }
 
 
 double
-ConcreteDPM2Rate::computeRateFactorCompression(double strainRate,
+ConcreteDPM2Rate::computeRateFactorCompression(double deltaTime,
 					   GaussPoint *gp,
 					   TimeStep *tStep) const
 {
     //For compression according to Model Code 2010
+    auto status = static_cast < ConcreteDPM2RateStatus * > ( this->giveStatus(gp) );
+
+    const auto &strain = status->giveTempReducedStrain();
+
+    //Determine the principal values of the strain
+
+    auto principalStrain = StructuralMaterial::computePrincipalValues( from_voigt_strain(strain) );  ///@todo CHECK
+
+    //Determine max and min value;
+    double maxStrain = -1.e20, minStrain = 1.e20;
+    for ( int k = 1; k <= principalStrain.giveSize(); k++ ) {
+      //maximum
+      if ( principalStrain.at(k) > maxStrain ) {
+            maxStrain = principalStrain.at(k);
+      }
+
+      //minimum
+      if ( principalStrain.at(k) < minStrain ) {
+            minStrain = principalStrain.at(k);
+      }
+    }
+
+    //Evaluate the equivalent strains
+    double strainRateTension;
+    double strainRateCompression;
+    double oldRateStrainCompression = status->giveRateStrainCompression();
+    double oldRateStrainTension = status->giveRateStrainTension();
+
+
+    //if ( 1. - alpha > CDPM2_TOL ) { //Tension
+
+    //Tension
+    //        if(status->giveTempDamageTension()<yieldTolDamage) {
+    //strainRateTension = ( maxStrain - oldRateStrainTension ) / deltaTime;
+    //        }else{ Needs to involve beta to get it right
+    //            strainRateTension = ( maxStrain - oldRateStrainTension )*status->giveLe()/ deltaTime;
+    //        }
+
+    //Compression (multiply by -1 so that input parameters can be positive
+    strainRateCompression = -( minStrain - oldRateStrainCompression ) / deltaTime;
+    status->setTempRateStrainCompression(minStrain);
+
+
+
+
+
+
+
+
     double rateFactorCompression = 1.;
-    double strainRateRatioCompression = strainRate / this->acOne ;
-    if ( this->acOne < strainRate && strainRate < this->acTwo ) {
+    double strainRateRatioCompression = strainRateCompression / this->acOne ;
+    if ( this->acOne < strainRateCompression && strainRateCompression < this->acTwo ) {
       rateFactorCompression = pow(strainRateRatioCompression, this->acThree);
-    } else if ( this->acTwo <= strainRate ) {
+    } else if ( this->acTwo <= strainRateCompression ) {
       rateFactorCompression =  this->acFour * pow(strainRateRatioCompression, this->acFive);
     }    
 

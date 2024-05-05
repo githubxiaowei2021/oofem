@@ -184,16 +184,16 @@ class ConcreteDPM2PlasticRate1 : public ConcreteDPM2
     double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld, GaussPoint *gp) const;
 
     /// Compute equivalent strain value for tension.
-    double computeDeltaPlasticStrainNormTension(double tempKappaD, double kappaD, GaussPoint *gp) const;
+    double computeDeltaPlasticStrainNormTensionP(double tempKappaD, double kappaD, GaussPoint *gp) const;
 
     /// Compute equivalent strain value for compression.
-    double computeDeltaPlasticStrainNormCompression(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const;
+    double computeDeltaPlasticStrainNormCompressionP(double tempAlpha, double tempKappaD, double kappaD, GaussPoint *gp, const double rho) const;
 
 
     /**
      * This function computes the rate factor which is used to take into account the strain rate dependence of the material.
      */
-    void computeRateFactor(double alpha, double timeFactor, GaussPoint *gp, TimeStep *deltaTime) const;
+    void computeRateFactorP(double alpha, double timeFactor, GaussPoint *gp, TimeStep *deltaTime) const;
 
     FloatArrayF< 2 >computeDFDInv(double sig, double rho, double theta, double tempKappa, const double dt, GaussPoint *gp) const;
     double computeEquivalentStrainP(double sig, double rho, double theta, const double dt, GaussPoint *gp) const;

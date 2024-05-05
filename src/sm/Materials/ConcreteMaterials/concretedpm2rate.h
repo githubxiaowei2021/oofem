@@ -84,6 +84,12 @@ protected:
 
     double rateFactorCompression = 0.;
     double tempRateFactorCompression = 0.;
+
+    double rateStrainTension = 0.;
+    double tempRateStrainTension = 0.;
+
+    double rateStrainCompression = 0.;
+    double tempRateStrainCompression = 0.;
     
 public:
     /// Constructor
@@ -107,11 +113,17 @@ public:
     double giveTempStrainRateCompression() const { return tempStrainRateCompression;}
     double giveTempRateFactorCompression() const { return tempRateFactorCompression;}
 
+    double giveRateStrainTension() const {return rateStrainTension;}
+    double giveRateStrainCompression() const {return rateStrainCompression;}
+
     void setTempBeta(double newBeta) { tempBeta = newBeta; }
     void setTempStrainRateTension(double newStrainRate) { tempStrainRateTension = newStrainRate; }
     void setTempRateFactorTension(double newRateFactor) { tempRateFactorTension = newRateFactor; }
     void setTempStrainRateCompression(double newStrainRate) { tempStrainRateCompression = newStrainRate; }
     void setTempRateFactorCompression(double newRateFactor) { tempRateFactorCompression = newRateFactor; }
+
+    void setTempRateStrainTension(double newRateStrain) { tempRateStrainTension = newRateStrain;}
+    void setTempRateStrainCompression(double newRateStrain) { tempRateStrainCompression = newRateStrain;}
 
     const char *giveClassName() const override { return "ConcreteDPM2RateStatus"; }
 
@@ -153,9 +165,9 @@ public:
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
     
-    double computeRateFactorTension(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
+    double computeRateFactorTension(double deltaTime, GaussPoint *gp, TimeStep *tStep) const;
 
-    double computeRateFactorCompression(const double strainRate, GaussPoint *gp, TimeStep *deltaTime) const;
+    double computeRateFactorCompression(double deltaTime, GaussPoint *gp, TimeStep *tStep) const;
 
     /// Compute damage parameter in compression.
     double computeDamageParamCompression(double equivStrain, double kappaOne, double kappaTwo, double omegaOld) const;
