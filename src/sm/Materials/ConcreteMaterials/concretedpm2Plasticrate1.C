@@ -1306,11 +1306,10 @@ ConcreteDPM2PlasticRate1::computeDamageParamCompression(double equivStrain, doub
     double ftTemp = this->ft * ( 1. - yieldTolDamage ) * status->giveRateFactor();
     double efCompressionMod = this->efCompression;
 
-//        if ( this->energyRateType == 0 ) {
-//            efCompressionMod /= pow(rateFactor, 2.);
-//        } else if ( this->energyRateType == 1 ) {
-//            efCompressionMod /= rateFactor;
-//        }
+       if ( this->energyRateType == 0 ) {
+
+          efCompressionMod /= rateFactor;
+     }
 
     double omega = 1.;
     int nite = 0;
@@ -2137,6 +2136,15 @@ int
 ConcreteDPM2PlasticRate1::giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep)
 {
     ConcreteDPM2PlasticRate1Status *status = static_cast < ConcreteDPM2PlasticRate1Status * > ( this->giveStatus(gp) );
+    if ( type == IST_RateFactor ) {
+                                answer.resize(1);
+                                answer.zero();
+                                answer.at(1) = status->giveRateFactor();
+                                return 1;
+    } else {
+                                return ConcreteDPM2 :: giveIPValue(answer, gp, type, tStep);
+    }
+
 }
 
 MaterialStatus *
